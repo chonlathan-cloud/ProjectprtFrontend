@@ -1,0 +1,8 @@
+{
+  "name": "PRT Financial Dashboard",
+  "description": "A comprehensive financial management dashboard featuring expense tracking, income analysis, and AI-powered chat insights.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
