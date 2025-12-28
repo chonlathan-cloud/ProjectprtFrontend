@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
-import { Sidebar } from './components/Sidebar';
-import { Dashboard } from './components/Dashboard';
-import { ChatView } from './components/ChatView';
+import { Sidebar } from './src/components/Sidebar';
+import { Dashboard } from './src/components/Dashboard';
+import { ChatView } from './src/components/ChatView';
 import { ViewType } from './types';
 
 const App: React.FC = () => {
