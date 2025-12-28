@@ -1,48 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Search, MoreHorizontal, Wallet, TrendingUp, CreditCard, ChevronLeft, ChevronRight, Sun, Moon } from 'lucide-react';
-
+import  { getDashboardData, DashboardData} from '../services/api';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
   PieChart, Pie
 } from 'recharts';
-
-// --- Interfaces for Data Structure ---
-interface MonthlyData {
-  name: string;
-  value: number;
-  highlight?: boolean;
-}
-
-interface ActivityData {
-  name: string;
-  value: number;
-  fill: string;
-}
-
-interface TransactionItem {
-  id: string;
-  initial: string;
-  name: string;
-  description: string;
-  amount: number;
-}
-
-interface DashboardData {
-  summary: {
-    expenses: number;
-    income: number;
-    balance: number;
-  };
-  monthlyStats: MonthlyData[];
-  activityStats: ActivityData[];
-  latestTransactions: TransactionItem[];
-}
-
-interface DashboardProps {
-  isDarkMode: boolean;
-  toggleTheme: () => void;
-}
-
 // --- Initial Empty State (Ready for Backend) ---
 const INITIAL_DATA: DashboardData = {
   summary: {
@@ -69,15 +31,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ isDarkMode, toggleTheme })
     const fetchData = async () => {
       setLoading(true);
       try {
-        const response = await fetch(`/api/dashboard?year=${selectedYear}`);
-        const result = await response.json();
-        if (result) {
-          setData(result);
-        }
+        // use getDashboardData from api.ts replace "fetch" logic
+        const data = await getDashboardData(selectedYear);
+        setData(data);
       } catch (error) {
         console.error("Failed to fetch dashboard data", error);
         // Fallback to empty/initial data if failed
-        setData(INITIAL_DATA);
       } finally {
         setLoading(false);
       }
