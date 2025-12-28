@@ -9,8 +9,8 @@ import {
   Search,
   MoreHorizontal
 } from 'lucide-react';
-import { ViewType } from '../types';
-import mylogo from '../src/mylogo.png';
+import { ViewType } from '../../types';
+import mylogo from '../mylogo.png';
 
 interface SidebarProps {
   activeView: ViewType;
