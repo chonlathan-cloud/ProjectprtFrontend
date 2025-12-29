@@ -2,11 +2,11 @@ import axios from 'axios';
 import { Category, DashboardData } from '../types';
 
 // --- CONFIGURATION ---
-const API_BASE_URL = 'http://127.0.0.1:8000/api/v1';
+const API_BASE_URL = 'https://backend-api-886029565568.asia-southeast1.run.app/api/v1';
 
 // ⚠️ HARDCODED TOKEN FOR DEV/TESTING (Replace with real logic later)
 // เอา Token ที่ได้จาก test_phase5.py หรือยิง curl มาใส่ตรงนี้ครับ
-const DEV_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZG1pbl9nb29nbGVfaWRfMTIzIiwiZW1haWwiOiJhZG1pbkB0ZXN0LmNvbSIsIm5hbWUiOiJBZG1pbiIsImlhdCI6MTc2NjkxMDkyMCwiZXhwIjoxNzY2OTE0NTIwfQ.p66MlYICKkqBOYbQ3zvRlVSjNGU-I5d1bJTcrHfVBiQ"; 
+const DEV_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZG1pbl9nb29nbGVfaWRfMTIzIiwiZW1haWwiOiJhZG1pbkB0ZXN0LmNvbSIsIm5hbWUiOiJBZG1pbiIsImlhdCI6MTc2Njk4MDc1OSwiZXhwIjoxNzY2OTg0MzU5fQ.4GHalNBMpbvjAp1ysNh5jKg0wkzBYVs4XLqVLEel0NY"; 
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
