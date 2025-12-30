@@ -52,4 +52,7 @@ export const getCategories = async (type?: 'EXPENSE' | 'REVENUE' | 'ASSET'): Pro
   
   // Backend ส่งกลับมาเป็น { success: true, data: [ ... ] }
   return response.data.data;
+=======
+  // Backend ส่งมาในรูปแบบ { success: true, data: { ... } }
+  return response.data.data; 
 };
