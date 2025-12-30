@@ -21,7 +21,7 @@ const INITIAL_DATA: DocumentData = {
   to: '',
   purpose: '',
   items: [
-    { id: '1', description: '', quantity: 1, unit: 'ชิ้น', price: 0, note: '', receiveNo: '', receiptDate: '', receiptNo: '' }
+    { id: '1', description: '', quantity: '', unit: '', price: '', note: '', receiveNo: '', receiptDate: '', receiptNo: '' }
   ]
 };
 
@@ -51,9 +51,9 @@ export const Form: React.FC = () => {
       items: [...prev.items, { 
         id: Date.now().toString(), 
         description: '', 
-        quantity: 1, 
-        unit: 'ชิ้น', 
-        price: 0,
+        quantity: '', 
+        unit: '', 
+        price: '',
         note: '',
         receiveNo: '',
         receiptDate: '',
@@ -293,39 +293,42 @@ export const Form: React.FC = () => {
                     <div key={item.id} className="p-4 bg-gray-50 rounded-xl group relative">
                        <div className="flex gap-3 items-start">
                           <div className="flex-1">
-                             <div className="flex gap-3 mb-2">
+                             <div className="flex gap-3 mb-4">
                                 <span className="text-xs text-gray-400 mt-3">{index + 1}.</span>
-                                <input 
-                                  type="text" 
-                                  placeholder="รายการ"
-                                  className={`${inputStyle} bg-white`}
-                                  value={item.description}
-                                  onChange={(e) => handleItemChange(item.id, 'description', e.target.value)}
-                                />
+                                <div className="flex-1">
+                                  <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase tracking-wider">รายการสินค้า / รายละเอียด</label>
+                                  <input 
+                                    type="text" 
+                                    placeholder="กรอกชื่อรายการ"
+                                    className={`${inputStyle} bg-white`}
+                                    value={item.description}
+                                    onChange={(e) => handleItemChange(item.id, 'description', e.target.value)}
+                                  />
+                                </div>
                              </div>
                              <div className="flex gap-3 pl-6">
                                 <div className="w-24">
+                                   <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase tracking-wider">จำนวน</label>
                                    <input 
-                                    type="number" 
-                                    placeholder="จำนวน"
+                                    type="text" 
                                     className={`${inputStyle} bg-white`}
                                     value={item.quantity}
-                                    onChange={(e) => handleItemChange(item.id, 'quantity', parseInt(e.target.value) || 0)}
+                                    onChange={(e) => handleItemChange(item.id, 'quantity', e.target.value)}
                                   />
                                 </div>
-                                 <div className="w-24">
+                                <div className="w-24">
+                                   <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase tracking-wider">ราคา (บาท)</label>
                                    <input 
-                                    type="number" 
-                                    placeholder="ราคา"
+                                    type="text" 
                                     className={`${inputStyle} bg-white`}
                                     value={item.price}
-                                    onChange={(e) => handleItemChange(item.id, 'price', parseFloat(e.target.value) || 0)}
+                                    onChange={(e) => handleItemChange(item.id, 'price', e.target.value)}
                                   />
                                 </div>
                                 <div className="flex-1">
+                                   <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase tracking-wider">หน่วยสินค้า</label>
                                    <input 
                                     type="text" 
-                                    placeholder="หน่วย"
                                     className={`${inputStyle} bg-white`}
                                     value={item.unit}
                                     onChange={(e) => handleItemChange(item.id, 'unit', e.target.value)}
@@ -335,7 +338,7 @@ export const Form: React.FC = () => {
                           </div>
                           <button 
                             onClick={() => removeItem(item.id)}
-                            className="p-2 text-red-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                            className="p-2 text-red-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors mt-6"
                           >
                             <Trash2 size={18} />
                           </button>

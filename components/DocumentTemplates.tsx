@@ -15,9 +15,9 @@ export interface DocumentData {
   items: Array<{
     id: string;
     description: string;
-    quantity: number;
+    quantity: number | string;
     unit: string;
-    price: number; // For withdrawal/purchase
+    price: number | string; // For withdrawal/purchase
     note?: string; // For return/purchase
     receiveNo?: string; // For return
     receiptDate?: string; // For return
@@ -26,7 +26,11 @@ export interface DocumentData {
 }
 
 export const WithdrawalTemplate = forwardRef<HTMLDivElement, { data: DocumentData }>(({ data }, ref) => {
-  const total = data.items.reduce((sum, item) => sum + (item.quantity * item.price), 0);
+  const total = data.items.reduce((sum, item) => {
+    const q = typeof item.quantity === 'number' ? item.quantity : Number.parseFloat(item.quantity) || 0;
+    const p = typeof item.price === 'number' ? item.price : Number.parseFloat(item.price) || 0;
+    return sum + (q * p);
+  }, 0);
 
   return (
     <div ref={ref} className="bg-white p-8 text-black text-sm font-serif" style={{ width: '210mm', minHeight: '297mm' }}>
@@ -75,15 +79,19 @@ export const WithdrawalTemplate = forwardRef<HTMLDivElement, { data: DocumentDat
           </tr>
         </thead>
         <tbody>
-          {data.items.map((item, index) => (
-            <tr key={item.id} className="h-8">
-              <td className="border border-black p-2 text-center">{index + 1}</td>
-              <td className="border border-black p-2">{item.description}</td>
-              <td className="border border-black p-2 text-center">{item.quantity}</td>
-              <td className="border border-black p-2 text-right">{item.unit}</td>
-              <td className="border border-black p-2 text-right">{(item.quantity * item.price).toLocaleString()}</td>
-            </tr>
-          ))}
+          {data.items.map((item, index) => {
+            const q = typeof item.quantity === 'number' ? item.quantity : Number.parseFloat(item.quantity) || 0;
+            const p = typeof item.price === 'number' ? item.price : Number.parseFloat(item.price) || 0;
+            return (
+              <tr key={item.id} className="h-8">
+                <td className="border border-black p-2 text-center">{index + 1}</td>
+                <td className="border border-black p-2">{item.description}</td>
+                <td className="border border-black p-2 text-center">{item.quantity} {item.unit}</td>
+                <td className="border border-black p-2 text-right">{p.toLocaleString()}</td>
+                <td className="border border-black p-2 text-right">{(q * p).toLocaleString()}</td>
+              </tr>
+            );
+          })}
           {/* Empty rows to fill table */}
           {Array.from({ length: Math.max(0, 10 - data.items.length) }).map((_, i) => (
             <tr key={`empty-${i}`} className="h-8">
@@ -148,7 +156,11 @@ export const WithdrawalTemplate = forwardRef<HTMLDivElement, { data: DocumentDat
 });
 
 export const ReturnTemplate = forwardRef<HTMLDivElement, { data: DocumentData }>(({ data }, ref) => {
-    const total = data.items.reduce((sum, item) => sum + (item.quantity * item.price), 0);
+    const total = data.items.reduce((sum, item) => {
+    const q = typeof item.quantity === 'number' ? item.quantity : Number.parseFloat(item.quantity) || 0;
+    const p = typeof item.price === 'number' ? item.price : Number.parseFloat(item.price) || 0;
+    return sum + (q * p);
+  }, 0);
   return (
     <div ref={ref} className="bg-white p-8 text-black text-sm font-serif" style={{ width: '210mm', minHeight: '297mm' }}>
       <div className="text-center mb-6">
@@ -186,17 +198,21 @@ export const ReturnTemplate = forwardRef<HTMLDivElement, { data: DocumentData }>
           </tr>
         </thead>
         <tbody>
-           {data.items.map((item, index) => (
-            <tr key={item.id} className="h-8">
-              <td className="border border-black p-2 text-center">{index + 1}</td>
-              <td className="border border-black p-2">{item.receiveNo}</td>
-               <td className="border border-black p-2">{item.receiptDate}</td>
-                <td className="border border-black p-2">{item.receiptNo}</td>
-              <td className="border border-black p-2">{item.description}</td>
-              <td className="border border-black p-2 text-right">{(item.quantity * item.price).toLocaleString()}</td>
-               <td className="border border-black p-2">{item.note}</td>
-            </tr>
-          ))}
+           {data.items.map((item, index) => {
+             const q = typeof item.quantity === 'number' ? item.quantity : Number.parseFloat(item.quantity) || 0;
+             const p = typeof item.price === 'number' ? item.price : Number.parseFloat(item.price) || 0;
+             return (
+               <tr key={item.id} className="h-8">
+                 <td className="border border-black p-2 text-center">{index + 1}</td>
+                 <td className="border border-black p-2">{item.receiveNo}</td>
+                 <td className="border border-black p-2">{item.receiptDate}</td>
+                 <td className="border border-black p-2">{item.receiptNo}</td>
+                 <td className="border border-black p-2">{item.description}</td>
+                 <td className="border border-black p-2 text-right">{(q * p).toLocaleString()}</td>
+                 <td className="border border-black p-2">{item.note}</td>
+               </tr>
+             );
+           })}
            {/* Empty rows */}
           {Array.from({ length: Math.max(0, 10 - data.items.length) }).map((_, i) => (
             <tr key={`empty-${i}`} className="h-8">
@@ -253,7 +269,11 @@ export const ReturnTemplate = forwardRef<HTMLDivElement, { data: DocumentData }>
 
 
 export const PurchaseTemplate = forwardRef<HTMLDivElement, { data: DocumentData }>(({ data }, ref) => {
-     const total = data.items.reduce((sum, item) => sum + (item.quantity * item.price), 0);
+     const total = data.items.reduce((sum, item) => {
+    const q = typeof item.quantity === 'number' ? item.quantity : Number.parseFloat(item.quantity) || 0;
+    const p = typeof item.price === 'number' ? item.price : Number.parseFloat(item.price) || 0;
+    return sum + (q * p);
+  }, 0);
   return (
     <div ref={ref} className="bg-white p-8 text-black text-sm font-serif" style={{ width: '210mm', minHeight: '297mm' }}>
       <div className="flex mb-4">
@@ -321,16 +341,20 @@ export const PurchaseTemplate = forwardRef<HTMLDivElement, { data: DocumentData 
           </tr>
         </thead>
         <tbody>
-          {data.items.map((item, index) => (
-            <tr key={item.id} className="h-8">
-              <td className="border border-black p-2 text-center">{index + 1}</td>
-              <td className="border border-black p-2">{item.description}</td>
-              <td className="border border-black p-2 text-center">{item.quantity}</td>
-              <td className="border border-black p-2 text-center">{item.unit}</td>
-              <td className="border border-black p-2 text-right">{item.price.toLocaleString()}</td>
-              <td className="border border-black p-2">{item.note}</td>
-            </tr>
-          ))}
+          {data.items.map((item, index) => {
+            const q = typeof item.quantity === 'number' ? item.quantity : Number.parseFloat(item.quantity) || 0;
+            const p = typeof item.price === 'number' ? item.price : Number.parseFloat(item.price) || 0;
+            return (
+              <tr key={item.id} className="h-8">
+                <td className="border border-black p-2 text-center">{index + 1}</td>
+                <td className="border border-black p-2">{item.description}</td>
+                <td className="border border-black p-2 text-center">{item.quantity} {item.unit}</td>
+                <td className="border border-black p-2 text-center">{p.toLocaleString()}</td>
+                <td className="border border-black p-2 text-right">{(q * p).toLocaleString()}</td>
+                <td className="border border-black p-2">{item.note}</td>
+              </tr>
+            );
+          })}
            {Array.from({ length: Math.max(0, 5 - data.items.length) }).map((_, i) => (
             <tr key={`empty-${i}`} className="h-8">
               <td className="border border-black p-2"></td>
