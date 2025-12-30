@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { Category, DashboardData } from '../types';
 
 // --- CONFIGURATION ---
 const API_BASE_URL = 'https://backend-api-886029565568.asia-southeast1.run.app/api/v1';
@@ -38,6 +39,20 @@ export interface DashboardData {
 // API Calls
 export const getDashboardData = async (year: number): Promise<DashboardData> => {
   const response = await api.get(`/dashboard?year=${year}`);
+  return response.data.data;
+};
+
+// 2. Categories (อันใหม่ แก้ไขแล้ว)
+export const getCategories = async (type?: 'EXPENSE' | 'REVENUE' | 'ASSET'): Promise<Category[]> => {
+  const query = type ? `?type=${type}` : '';
+  
+  // ยิงไปที่ /categories (หรือ /api/categories ตาม URL จริงของ Backend)
+  // หมายเหตุ: เช็ค Backend Router ด้วยว่า Prefix เป็น /api/v1/categories หรือยัง
+  const response = await api.get(`/categories${query}`);
+  
+  // Backend ส่งกลับมาเป็น { success: true, data: [ ... ] }
+  return response.data.data;
+=======
   // Backend ส่งมาในรูปแบบ { success: true, data: { ... } }
   return response.data.data; 
 };

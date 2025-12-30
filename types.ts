@@ -20,3 +20,11 @@ export interface MonthlyData {
   value: number;
   highlight?: boolean;
 }
+
+export interface Category {
+  id: string;
+  name_th: string;
+  type: 'EXPENSE' | 'INCOME' | 'ASSET';
+  accout_type: string;
+  is_active: boolean;
+}
