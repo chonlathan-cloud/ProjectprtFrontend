@@ -4,6 +4,7 @@ import { Sidebar } from './components/Sidebar';
 import { Dashboard } from './components/Dashboard';
 import { ChatView } from './components/ChatView';
 import { LoginForm } from './components/LoginForm';
+import { Form } from './components/Form';
 import { ViewType } from './types';
 
 const App: React.FC = () => {
@@ -43,6 +44,8 @@ const App: React.FC = () => {
         return <Dashboard isDarkMode={isDarkMode} toggleTheme={toggleTheme} />;
       case ViewType.CHAT_VIEW:
         return <ChatView />;
+      case ViewType.FORM:
+        return <Form />;
       default:
         return (
           <div className="flex items-center justify-center h-full">
