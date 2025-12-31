@@ -290,7 +290,7 @@ export const PurchaseTemplate = forwardRef<HTMLDivElement, { data: DocumentData 
          <div className="flex gap-4">
              <div className="flex-1 flex">
                  <span className="w-24 font-bold">ที่</span>
-                 <span>ปส {data.docNo}</span>
+                 <span>ปส 03011007 / {data.docNo}</span>
              </div>
              <div className="flex-1 flex">
                  <span className="w-16 font-bold">วันที่</span>

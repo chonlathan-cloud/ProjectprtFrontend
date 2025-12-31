@@ -28,3 +28,19 @@ export interface Category {
   accout_type: string;
   is_active: boolean;
 }
+
+export interface CasePayload {
+  category_id: string;
+  requested_amount: number;
+  purpose: string;
+  department_id?: string;
+  cost_center_id?: string;
+  funding_type: 'OPERATING' | 'GOV_BUDGET';
+}
+
+export interface CaseResponse {
+  id: string;
+  case_no: string;
+  status: string;
+  // ... fields อื่นๆ
+}
