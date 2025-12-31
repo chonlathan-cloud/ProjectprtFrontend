@@ -80,7 +80,4 @@ export const getCategories = async (type?: 'EXPENSE' | 'REVENUE' | 'ASSET'): Pro
   const query = type ? `?type=${type}` : '';
   const response = await api.get(`/categories${query}`);
   return response.data.data;
-=======
-  // Backend ส่งมาในรูปแบบ { success: true, data: { ... } }
-  return response.data.data; 
 };
