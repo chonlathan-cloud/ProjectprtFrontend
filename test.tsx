@@ -1,82 +1,36 @@
-// src/components/Form.tsx
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import { 
   Search, MoreHorizontal, Plus, Trash2, Download, Save, 
-  Loader2 
+  Printer, FileText, Calendar, Loader2 
 } from 'lucide-react';
-import { PaymentVoucherTemplate, ReceiveVoucherTemplate, JournalVoucherTemplate, DocumentData } from './DocumentTemplates';
+import { WithdrawalTemplate, ReturnTemplate, PurchaseTemplate, DocumentData } from './DocumentTemplates';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
-import { createCase, submitCase, getCategories, getUsers, getBankAccounts } from '../services/api'; // Import API
-import { Category, User, BankAccount } from '../../types'; // Import Types
+import { saveDocument } from '../services/documentService';
 
 const INITIAL_DATA: DocumentData = {
-  type: 'pv', 
+  type: 'withdrawal',
   docNo: '',
-  date: new Date().getDate().toString().padStart(2, '0'),
-  month: new Date().toLocaleString('th-TH', { month: 'long' }),
-  year: (new Date().getFullYear() + 543).toString(),
+  date: '',
+  month: '',
+  year: '',
   name: '',
   position: '',
-  bankAccount: '',
-  makerName: '',
   department: '',
   subject: '',
+  to: '',
   purpose: '',
   items: [
-    { id: '1', description: '', quantity: '', unit: '', price: '', refNo: '' }
+    { id: '1', description: '', quantity: '', unit: '', price: '', note: '', receiveNo: '', receiptDate: '', receiptNo: '' }
   ]
 };
 
 export const Form: React.FC = () => {
   const [data, setData] = useState<DocumentData>(INITIAL_DATA);
   const [isSaving, setIsSaving] = useState(false);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [users, setUsers] = useState<User[]>([]);
-  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
-  const [transactionType, setTransactionType] = useState<'EXPENSE' | 'INCOME'>('EXPENSE');
-  
   const printRef = useRef<HTMLDivElement>(null);
 
-  // 1. โหลดข้อมูลเมื่อเข้าหน้า Form
-  useEffect(() => {
-    // A. ดึง User จาก LocalStorage มาเป็น Default
-    const storedUser = localStorage.getItem('user');
-    if (storedUser) {
-      try {
-        const userObj = JSON.parse(storedUser);
-        if (userObj.name) {
-          setData(prev => ({ ...prev, name: userObj.name }));
-        }
-      } catch (e) {
-        console.error("Failed to parse user data", e);
-      }
-    }
-
-    // B. ดึง Categories ตาม transactionType
-    const fetchCats = async () => {
-      try {
-        const cats = await getCategories(transactionType);
-        setCategories(cats);
-      } catch (error) {
-        console.error("Error fetching categories:", error);
-      }
-    };
-    fetchCats();
-
-    // C. ดึง Users และ Bank Accounts
-    const fetchOtherData = async () => {
-      try {
-        const [u, b] = await Promise.all([getUsers(), getBankAccounts()]);
-        setUsers(u);
-        setBankAccounts(b);
-      } catch (error) {
-        console.error("Error fetching other data:", error);
-      }
-    };
-    fetchOtherData();
-  }, [transactionType]);
+  // No longer fetching in advance - number comes from backend on save
 
   const handleInputChange = (field: keyof DocumentData, value: string) => {
     setData(prev => ({ ...prev, [field]: value }));
@@ -100,7 +54,10 @@ export const Form: React.FC = () => {
         quantity: '', 
         unit: '', 
         price: '',
-        refNo: ''
+        note: '',
+        receiveNo: '',
+        receiptDate: '',
+        receiptNo: ''
       }]
     }));
   };
@@ -113,103 +70,44 @@ export const Form: React.FC = () => {
     }));
   };
 
-  // 2. Logic การ Save ไป Backend
-  const handleSaveToBackend = async () => {
-    if (!selectedCategoryId) {
-      alert("กรุณาเลือกหมวดหมู่บัญชี (Category) ก่อนบันทึก");
-      return;
-    }
-
-    setIsSaving(true);
-    try {
-      // 2.1 คำนวณยอดรวม (Items vs Amount)
-      const totalAmount = data.items.reduce((sum, item) => {
-        const q = Number(item.quantity) || 0;
-        const p = Number(item.price) || 0;
-        return sum + (q * p);
-      }, 0);
-
-      // 2.2 รวมชื่อรายการสินค้าใส่ Purpose (เพื่อให้ Search เจอในอนาคต)
-      // เอา Purpose ที่ user กรอก + รายการสินค้า
-      const itemsDescription = data.items
-        .map(i => i.description)
-        .filter(d => d.trim() !== '')
-        .join(', ');
-      
-      let finalPurpose = data.purpose;
-      if (itemsDescription) {
-        finalPurpose = `${finalPurpose ? finalPurpose + ' : ' : ''}${itemsDescription}`;
-      }
-      
-      // ถ้า finalPurpose ว่างจริงๆ ให้ใส่ default
-      if (!finalPurpose.trim()) finalPurpose = "ค่าใช้จ่ายทั่วไป";
-
-      // 2.3 สร้าง Payload
-      const casePayload = {
-        category_id: selectedCategoryId,
-        requested_amount: totalAmount,
-        purpose: finalPurpose,
-        department_id: data.department,
-        funding_type: 'OPERATING' as const,
-      };
-
-      console.log("Creating Case with:", casePayload);
-
-      // 2.4 Call API Create Case
-      const newCase = await createCase(casePayload);
-      
-      // 2.5 Call API Submit Case (ถ้าต้องการ Submit เลย)
-      const submitResult = await submitCase(newCase.id);
-
-      // 2.6 อัปเดตเลขที่เอกสารในหน้าจอ
-      const finalDocNO = submitResult.doc_no || newCase.case_no;
-
-      setData(prev => ({ ...prev, docNo: finalDocNO }));
-      
-      alert(`บันทึกสำเร็จ! ได้เลขที่เอกสาร: ${finalDocNO}`);
-      return true; // Return true บอกว่าสำเร็จ
-
-    } catch (error: any) {
-      console.error('Save failed:', error);
-      const msg = error.response?.data?.error?.message || error.message;
-      alert(`บันทึกไม่สำเร็จ: ${msg}`);
-      return false;
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
   const generatePDF = async (action: 'submit' | 'download') => {
-    // ถ้ากด Submit ให้ Save ลง Backend ก่อน
-    if (action === 'submit') {
-        const success = await handleSaveToBackend();
-        if (!success) return; // ถ้า Save ไม่ผ่าน ไม่ต้อง Generate PDF ต่อ
-        
-        // รอแป๊บนึงให้ State docNo อัปเดตก่อน generate PDF
-        await new Promise(resolve => setTimeout(resolve, 500));
-    }
-
     if (!printRef.current) return;
 
     try {
+      if (action === 'submit') {
+        setIsSaving(true);
+        const result = await saveDocument(data);
+        if (!result.success) throw new Error('Save failed');
+        
+        // IMPORTANT: Update data with the confirmed docNo from backend
+        // We update state first
+        setData(prev => ({ ...prev, docNo: result.docNo }));
+        
+        // Wait for React to render the updated docNo in the template
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        setIsSaving(false);
+      }
+
       const canvas = await html2canvas(printRef.current, {
-        scale: 4, 
+        scale: 4, // Higher scale for better quality
         useCORS: true,
         logging: false,
         backgroundColor: '#ffffff',
-        windowWidth: 794,
+        windowWidth: 794, // A4 width in pixels at 96 DPI
         onclone: (clonedDoc) => {
+          // Remove potential scaling transforms from cloned document to capture at native size
           const element = clonedDoc.querySelector('.transform.scale-90');
           if (element instanceof HTMLElement) {
             element.style.transform = 'none';
           }
         }
-      } as any);
+      });
 
-      const imgData = canvas.toDataURL('image/jpeg', 1.0);
+      const imgData = canvas.toDataURL('image/jpeg', 1.0); // Use JPEG with max quality for better text anti-aliasing in some cases
       const pdf = new jsPDF({
         orientation: 'p',
-        unit: 'px',
+        unit: 'px', // Use pixels for more direct mapping
         format: 'a4'
       });
 
@@ -218,17 +116,16 @@ export const Form: React.FC = () => {
       
       pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight, undefined, 'FAST');
 
-      const fileName = `${data.type}_${data.docNo || 'draft'}.pdf`;
-
       if (action === 'download') {
-        pdf.save(fileName);
+        pdf.save(`${data.type}_document.pdf`);
       } else {
-        // กรณี Submit บันทึก PDF ลงเครื่องด้วย (หรือจะอัปโหลดกลับไป Backend ก็ได้ในอนาคต)
-        pdf.save(fileName);
+        alert('Document recorded successfully and PDF generated!'); 
+        pdf.save(`${data.type}_submitted_${data.docNo}.pdf`);
       }
     } catch (error) {
       console.error('Error generating PDF:', error);
-      alert('เกิดข้อผิดพลาดในการสร้าง PDF');
+      alert('Failed to process document');
+      setIsSaving(false);
     }
   };
 
@@ -256,50 +153,6 @@ export const Form: React.FC = () => {
             <h2 className="text-xl font-bold text-slate-800 mb-8">กรอกข้อมูลเอกสาร</h2>
             
             <div className="space-y-6 flex-1 overflow-y-auto pr-2 custom-scrollbar">
-              
-              {/* --- 1. Category Dropdown (เพิ่มใหม่ตาม Requirement) --- */}
-              <div>
-                <label className={labelStyle}>หมวดหมู่บัญชี (Category) <span className="text-red-500">*</span></label>
-                <div className="relative">
-                  <select 
-                    className={`${inputStyle} appearance-none cursor-pointer border-blue-200 bg-blue-50`}
-                    value={selectedCategoryId}
-                    onChange={(e) => setSelectedCategoryId(e.target.value)}
-                  >
-                    <option value="">-- กรุณาเลือกหมวดหมู่ --</option>
-                    {categories.map(cat => (
-                        <option key={cat.id} value={cat.id}>{cat.name_th}</option>
-                    ))}
-                  </select>
-                  <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-500">
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M2.5 4.5L6 8L9.5 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                  </div>
-                </div>
-              </div>
-              {/* ---------------------------------------------------- */}
-
-              {/* --- Transaction Type Dropdown --- */}
-              <div>
-                <label className={labelStyle}>ประเภทรายการ</label>
-                <div className="relative">
-                  <select 
-                    className={`${inputStyle} appearance-none cursor-pointer border-indigo-200 bg-indigo-50`}
-                    value={transactionType}
-                    onChange={(e) => setTransactionType(e.target.value as 'EXPENSE' | 'INCOME')}
-                  >
-                    <option value="EXPENSE">รายจ่าย (Expense)</option>
-                    <option value="INCOME">รายรับ (Income)</option>
-                  </select>
-                  <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-500">
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M2.5 4.5L6 8L9.5 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                  </div>
-                </div>
-              </div>
-
               <div>
                 <label className={labelStyle}>ลักษณะเอกสาร</label>
                 <div className="relative">
@@ -308,9 +161,9 @@ export const Form: React.FC = () => {
                     value={data.type}
                     onChange={(e) => handleInputChange('type', e.target.value)}
                   >
-                    <option value="pv">ใบเบิกเงิน (Payment Voucher - PV)</option>
-                    <option value="rv">ใบรับเงิน (Receive Voucher - RV)</option>
-                    <option value="jv">ใบสำคัญรายวันทั่วไป (Journal Voucher - JV)</option>
+                    <option value="withdrawal">ใบเบิกเงิน (Withdrawal)</option>
+                    <option value="return">ใบนำส่งเงินคืน (Return Money)</option>
+                    <option value="purchase">ขอจัดซื้อ (Purchase Request)</option>
                   </select>
                   <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-500">
                     <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -320,7 +173,6 @@ export const Form: React.FC = () => {
                 </div>
               </div>
 
-              {/* Date Selection Block (เหมือนเดิม) */}
               <div className="grid grid-cols-1 gap-4">
                 <div className="col-span-1">
                   <label className={labelStyle}>วันที่</label>
@@ -336,7 +188,13 @@ export const Form: React.FC = () => {
                            <option key={d} value={d.toString().padStart(2, '0')} className="text-gray-900">{d}</option>
                          ))}
                        </select>
+                        <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-gray-500">
+                          <svg width="10" height="10" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M2.5 4.5L6 8L9.5 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                        </div>
                      </div>
+                     
                      <div className="relative w-1/2">
                        <select
                         className={`${inputStyle} appearance-none cursor-pointer ${!data.month ? 'text-gray-400' : ''}`}
@@ -351,7 +209,13 @@ export const Form: React.FC = () => {
                            <option key={m} value={m} className="text-gray-900">{m}</option>
                          ))}
                        </select>
+                       <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-gray-500">
+                          <svg width="10" height="10" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M2.5 4.5L6 8L9.5 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                        </div>
                      </div>
+
                      <div className="relative w-1/4">
                        <select
                         className={`${inputStyle} appearance-none cursor-pointer ${!data.year ? 'text-gray-400' : ''}`}
@@ -363,39 +227,18 @@ export const Form: React.FC = () => {
                            <option key={y} value={y.toString()} className="text-gray-900">{y}</option>
                          ))}
                        </select>
+                       <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-gray-500">
+                          <svg width="10" height="10" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M2.5 4.5L6 8L9.5 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                        </div>
                      </div>
                   </div>
                 </div>
               </div>
 
-
-
-               {/* Bank Account Dropdown for RV */}
-               {data.type === 'rv' && (
-                  <div>
-                    <label className={labelStyle}>เลขที่บัญชีธนาคาร/เงินสด</label>
-                    <div className="relative">
-                      <select 
-                        className={`${inputStyle} appearance-none cursor-pointer`}
-                        value={data.bankAccount}
-                        onChange={(e) => handleInputChange('bankAccount', e.target.value)}
-                      >
-                        <option value="">-- เลือกเลขที่บัญชี --</option>
-                        {bankAccounts.map(b => (
-                          <option key={b.id} value={b.account_number}>{b.bank_name} - {b.account_number} ({b.account_name})</option>
-                        ))}
-                      </select>
-                      <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-500">
-                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M2.5 4.5L6 8L9.5 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                      </div>
-                    </div>
-                  </div>
-               )}
-
               <div>
-                <label htmlFor="name" className={labelStyle}>ข้าพเจ้า (ผู้ขอเบิก/ผู้รับเงิน)</label>
+                <label htmlFor="name" className={labelStyle}>ชื่อ-นามสกุล (ผู้เบิก/ผู้แจ้ง)</label>
                 <input 
                   id="name"
                   type="text" 
@@ -407,7 +250,7 @@ export const Form: React.FC = () => {
               </div>
 
                <div>
-                <label htmlFor="position" className={labelStyle}>ตำแหน่ง</label>
+                <label htmlFor="position" className={labelStyle}>ตำแหน่ง / แผนก</label>
                 <input 
                   id="position"
                   type="text" 
@@ -420,6 +263,23 @@ export const Form: React.FC = () => {
 
 
 
+               {/* Extra fields for Purchase */}
+               {data.type === 'purchase' && (
+                  <div className="p-4 bg-gray-50 rounded-xl space-y-4">
+                      <h3 className="font-semibold text-gray-700">ข้อมูลจัดซื้อ</h3>
+                      <div>
+                        <input type="text" className={inputStyle} placeholder="เรื่อง" value={data.subject} onChange={(e) => handleInputChange('subject', e.target.value)} />
+                      </div>
+                      <div>
+                        <input type="text" className={inputStyle} placeholder="ความประสงค์" value={data.purpose} onChange={(e) => handleInputChange('purpose', e.target.value)} />
+                      </div>
+                       <div>
+                        <input type="text" className={inputStyle} placeholder="หมวด/ฝ่าย" value={data.department} onChange={(e) => handleInputChange('department', e.target.value)} />
+                      </div>
+                  </div>
+               )}
+
+
               <div>
                 <div className="flex justify-between items-center mb-4">
                    <label className={labelStyle}>รายการที่เบิก / ทำ</label>
@@ -430,7 +290,7 @@ export const Form: React.FC = () => {
                 
                 <div className="space-y-3">
                   {data.items.map((item, index) => (
-                    <div key={item.id} className="p-4 bg-gray-50 rounded-xl group relative border border-gray-100 hover:border-blue-100 transition-colors">
+                    <div key={item.id} className="p-4 bg-gray-50 rounded-xl group relative">
                        <div className="flex gap-3 items-start">
                           <div className="flex-1">
                              <div className="flex gap-3 mb-4">
@@ -465,15 +325,13 @@ export const Form: React.FC = () => {
                                     onChange={(e) => handleItemChange(item.id, 'price', e.target.value)}
                                   />
                                 </div>
-                                 <div className="flex-1">
-                                   <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase tracking-wider">
-                                     {data.type === 'pv' ? 'หน่วยสินค้า' : 'เลขที่อ้างอิง'}
-                                   </label>
+                                <div className="flex-1">
+                                   <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase tracking-wider">หน่วยสินค้า</label>
                                    <input 
                                     type="text" 
                                     className={`${inputStyle} bg-white`}
-                                    value={data.type === 'pv' ? item.unit : item.refNo}
-                                    onChange={(e) => handleItemChange(item.id, data.type === 'pv' ? 'unit' : 'refNo', e.target.value)}
+                                    value={item.unit}
+                                    onChange={(e) => handleItemChange(item.id, 'unit', e.target.value)}
                                   />
                                 </div>
                              </div>
@@ -495,10 +353,10 @@ export const Form: React.FC = () => {
           {/* Right Side - Preview */}
           <div className="w-7/12 flex flex-col gap-6">
              <div className="flex-1 bg-gray-100 rounded-3xl overflow-hidden shadow-inner p-8 flex items-start justify-center overflow-y-auto">
-                <div className="transform scale-90 origin-top shadow-xl">
-                 {data.type === 'pv' && <PaymentVoucherTemplate ref={printRef} data={data} />}
-                 {data.type === 'rv' && <ReceiveVoucherTemplate ref={printRef} data={data} />}
-                 {data.type === 'jv' && <JournalVoucherTemplate ref={printRef} data={data} />}
+               <div className="transform scale-90 origin-top shadow-xl">
+                 {data.type === 'withdrawal' && <WithdrawalTemplate ref={printRef} data={data} />}
+                 {data.type === 'return' && <ReturnTemplate ref={printRef} data={data} />}
+                 {data.type === 'purchase' && <PurchaseTemplate ref={printRef} data={data} />}
                </div>
              </div>
 
@@ -513,7 +371,7 @@ export const Form: React.FC = () => {
                   ) : (
                     <Save size={20} />
                   )}
-                  บันทึกเอกสาร & ส่งอนุมัติ
+                  บันทึกเอกสาร
                 </button>
                 <button 
                   onClick={() => generatePDF('download')}
@@ -521,7 +379,7 @@ export const Form: React.FC = () => {
                   className="flex-1 bg-[#0099FF] text-white py-4 rounded-xl font-semibold flex items-center justify-center gap-2 hover:bg-blue-600 transition-colors shadow-sm shadow-blue-200 disabled:opacity-50"
                 >
                   <Download size={20} />
-                  ดาวน์โหลด PDF
+                  ดาวน์โหลด / ปริ้น
                 </button>
              </div>
           </div>
