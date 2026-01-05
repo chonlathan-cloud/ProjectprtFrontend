@@ -18,10 +18,16 @@ export interface DocumentData {
     description: string;
     quantity: number | string;
     unit: string;
-    price: number | string;
+
+    price: number | string; // For withdrawal/purchase
+    note?: string; // For return/purchase
+    receiveNo?: string; // For return
+    receiptDate?: string; // For return
+    receiptNo?: string; // For return
     refNo?: string;
   }>;
 }
+
 
 export const PaymentVoucherTemplate = forwardRef<HTMLDivElement, { data: DocumentData }>(({ data }, ref) => {
   const total = data.items.reduce((sum, item) => {
@@ -48,7 +54,6 @@ export const PaymentVoucherTemplate = forwardRef<HTMLDivElement, { data: Documen
         <p>โรงเรียนพระปริยัติธรรมวัดธรรมมงคล แผนกสามัญศึกษา</p>
         <p>132 ถนนสุขุมวิท 101 แขวงบางจาก เขตพระโขนง กรุงเทพฯ 10260</p>
       </div>
-
       <div className="flex justify-end mb-6">
         <span>{data.date} {data.month} {data.year}</span>
       </div>
@@ -96,6 +101,7 @@ export const PaymentVoucherTemplate = forwardRef<HTMLDivElement, { data: Documen
               <td className="border border-black p-2"></td>
               <td className="border border-black p-2"></td>
               <td className="border border-black p-2"></td>
+
             </tr>
           ))}
         </tbody>
@@ -107,7 +113,6 @@ export const PaymentVoucherTemplate = forwardRef<HTMLDivElement, { data: Documen
           </tr>
         </tfoot>
       </table>
-
       <div className="mt-20 text-center space-y-8">
         <h3 className="text-lg font-bold">ผู้ทำรายการ</h3>
         <div className="mb-2 relative">
