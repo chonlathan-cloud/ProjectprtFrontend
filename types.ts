@@ -49,6 +49,8 @@ export interface CasePayload {
   department_id?: string;
   cost_center_id?: string;
   funding_type: 'OPERATING' | 'GOV_BUDGET';
+  // [new] เพิ่มฟิลด์นี้สำหรับ RV (ระบุว่าจะเอาเงินเข้าบัญชีไหน)
+  deposit_account_id?: string;
 }
 
 export interface CaseResponse {
