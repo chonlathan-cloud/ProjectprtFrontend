@@ -6,6 +6,8 @@ import { ChatView } from './src/components/ChatView';
 import { LoginForm } from './src/components/LoginForm';
 import { Form } from './src/components/Form';
 import { ViewType } from './types';
+import { AdminApproval } from './src/components/AdminApproval';
+import { View } from 'lucide-react';
 
 const App: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -46,6 +48,8 @@ const App: React.FC = () => {
         return <ChatView />;
       case ViewType.FORM:
         return <Form />;
+      case ViewType.ADMIN_APPROVAL:
+        return <AdminApproval />;
       default:
         return (
           <div className="flex items-center justify-center h-full">
