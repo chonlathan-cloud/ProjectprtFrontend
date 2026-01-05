@@ -80,7 +80,7 @@ export const getDashboardData = async (year: number): Promise<DashboardData> => 
 };
 
 // --- แก้ไขตรงนี้ ---
-export const getCategories = async (type?: 'EXPENSE' | 'INCOME' | 'ASSET'): Promise<Category[]> => {
+export const getCategories = async (type?: 'EXPENSE' | 'REVENUE' | 'ASSET'): Promise<Category[]> => {
   const query = type ? `?type=${type}` : '';
   
   // 1. เพิ่ม / ปิดท้าย เพื่อแก้ 307
@@ -132,9 +132,9 @@ export const getBankAccounts = async (): Promise<BankAccount[]> => {
     const categories = await getCategories('ASSET');
     return categories.map(cat => ({
       id: cat.id,
-      account_number: cat.account_code, // สมมติว่าเก็บเลขบัญชีใน account_code
+      account_number: cat.account_code || '-', // สมมติว่าเก็บเลขบัญชีใน account_code
       account_name: cat.name_th,
-      bank_name: 'Unknown Bank' // เนื่องจากไม่มีข้อมูลธนาคารใน Category
+      bank_name: cat.name_th
     }));
   } catch (error) {
     console.error("Error fetching bank accounts from categories:", error);

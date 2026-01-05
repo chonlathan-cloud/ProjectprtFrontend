@@ -25,7 +25,7 @@ export interface MonthlyData {
 export interface Category {
   id: string;
   name_th: string;
-  type: 'EXPENSE' | 'INCOME' | 'ASSET';
+  type: 'EXPENSE' | 'REVENUE' | 'ASSET';
   account_code: string;
   is_active: boolean;
 }

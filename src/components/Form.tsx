@@ -35,7 +35,7 @@ export const Form: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
-  const [transactionType, setTransactionType] = useState<'EXPENSE' | 'INCOME'>('EXPENSE');
+  const [transactionType, setTransactionType] = useState<'EXPENSE' | 'REVENUE'>('EXPENSE');
   const [selectedBankAccountId, setSelectedBankAccountId] = useState<string>('');
   const printRef = useRef<HTMLDivElement>(null);
 
@@ -68,11 +68,20 @@ export const Form: React.FC = () => {
     // C. ดึง Users และ Bank Accounts
     const fetchOtherData = async () => {
       try {
-        const [u, b] = await Promise.all([getUsers(), getBankAccounts()]);
+        const u = await getUsers();
         setUsers(u);
+      } catch (error) {
+        console.warn("⚠️ Warning: Could not fetch users (API not found or error)", error);
+        // ไม่ต้อง throw error ปล่อยให้ทำงานต่อ
+      }
+
+      // 2. ดึง Bank Accounts (หัวใจสำคัญของ RV)
+      try {
+        const b = await getBankAccounts();
+        console.log("✅ Bank Accounts fetched:", b); // เช็คใน Console ว่าข้อมูลมาไหม
         setBankAccounts(b);
       } catch (error) {
-        console.error("Error fetching other data:", error);
+        console.error("❌ Error fetching bank accounts:", error);
       }
     };
     fetchOtherData();
@@ -298,10 +307,10 @@ export const Form: React.FC = () => {
                   <select 
                     className={`${inputStyle} appearance-none cursor-pointer border-indigo-200 bg-indigo-50`}
                     value={transactionType}
-                    onChange={(e) => setTransactionType(e.target.value as 'EXPENSE' | 'INCOME')}
+                    onChange={(e) => setTransactionType(e.target.value as 'EXPENSE' | 'REVENUE')}
                   >
                     <option value="EXPENSE">รายจ่าย (Expense)</option>
-                    <option value="INCOME">รายรับ (Income)</option>
+                    <option value="REVENUE">รายรับ (Revenue)</option>
                   </select>
                   <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-500">
                     <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -396,13 +405,16 @@ export const Form: React.FC = () => {
                           const account = bankAccounts.find(b => b.id === id);
                           if (account) {
                             // Update display text for Template
-                            handleInputChange('bankAccount', `${account.bank_name} - ${account.account_number}`); 
+                            const displayText = `${account.bank_name} - ${account.account_number}`;
+                            handleInputChange('bankAccount', displayText); 
                           }
                         }}
                       >
                         <option value="">-- เลือกเลขที่บัญชี --</option>
                         {bankAccounts.map(b => (
-                          <option key={b.id} value={b.id}>{b.bank_name} - {b.account_number} ({b.account_name})</option>
+                          <option key={b.id} value={b.id}>
+                            {b.bank_name} - {b.account_number}
+                          </option>
                         ))}
                       </select>
                       <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-500">
