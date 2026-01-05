@@ -4,9 +4,10 @@ import { login } from '../services/api';
 
 interface LoginFormProps {
   onLogin: () => void;
+  onSwitchToSignUp: () => void;
 }
 
-export const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
+export const LoginForm: React.FC<LoginFormProps> = ({ onLogin, onSwitchToSignUp }) => {
   // เปลี่ยนชื่อ state จาก username เป็น email เพื่อให้ตรงกับ Backend
   const [email, setEmail] = useState(''); 
   const [password, setPassword] = useState('');
@@ -22,8 +23,8 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
       // 1. เรียก API Login ของจริง
       const response = await login({ email, password });
 
-      if (response.success && response.data.access_token) {
-        localStorage.setItem('token', response.data.access_token);
+      if (response.success && response.data.accessToken) {
+        localStorage.setItem('token', response.data.accessToken);
         
         localStorage.setItem('user', JSON.stringify(response.data.user));
 
@@ -125,6 +126,19 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
                 )}
               </button>
             </form>
+
+            <div className="mt-4 text-center">
+              <p className="text-sm text-gray-600">
+                Don't have an account?{' '}
+                <button
+                  type="button"
+                  onClick={onSwitchToSignUp}
+                  className="text-blue-600 hover:text-blue-700 font-medium focus:outline-none"
+                >
+                  Sign Up
+                </button>
+              </p>
+            </div>
           </div>
           
           <div className="px-8 py-4 bg-gray-50 border-t border-gray-100 text-center">

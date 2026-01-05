@@ -8,6 +8,13 @@ export default defineConfig(({ mode }) => {
       server: {
         port: 3000,
         host: '0.0.0.0',
+        proxy: {
+          '/api/v1': {
+            target: 'https://backend-api-886029565568.asia-southeast1.run.app',
+            changeOrigin: true,
+            secure: false,
+          },
+        },
       },
       plugins: [react()],
       define: {
