@@ -115,6 +115,17 @@ export const getUsers = async (): Promise<User[]> => {
 
 // Fetch Bank Accounts
 export const getBankAccounts = async (): Promise<BankAccount[]> => {
-  const response = await api.get('/bank-accounts/'); // Assuming this endpoint
-  return Array.isArray(response.data) ? response.data : (response.data.data || []);
+  try {
+    //เรียก ร่างจาก category backend > bankAccounts Frontend
+    const categories = await getCatagories('ASSET');
+    return categories.map(cat => ({
+      id: cat.id,
+      account_number: cat.accout_type, // สมมติว่าเก็บเลขบัญชีใน accout_type
+      account_name: cat.name_th,
+      bank_name: 'Unknown Bank' // เนื่องจากไม่มีข้อมูลธนาคารใน Category
+    }));
+  } catch (error) {
+    console.error("Error fetching bank accounts from categories:", error);
+    return [];
+  }
 };
