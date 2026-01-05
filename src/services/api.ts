@@ -106,6 +106,18 @@ export const submitCase = async (caseId: string): Promise<WorkflowResponse> => {
   const response = await api.post(`/cases/${caseId}/submit`);
   return response.data;
 };
+// [NEW] ดึงรายการ Case (รองรับการกรองสถานะ)
+export const getCases = async (status?: string): Promise<CaseResponse[]> => {
+  const query = status ? `?status=${status}` : '';
+  const response = await api.get(`/cases/${query}`);
+  // Backend อาจจะส่งเป็น Array ตรงๆ หรือห่อด้วย data envelope ให้เช็คดู (ตามโค้ด Backend ล่าสุดน่าจะส่ง Array ตรงๆ)
+  return Array.isArray(response.data) ? response.data : (response.data.data || []);
+};
+// สั่งอนุมัติ Case
+export const approveCase = async (caseId: string): Promise<WorkflowResponse> => {
+  const response = await api.post(`/cases/${caseId}/approve`);
+  return response.data;
+};
 
 // Fetch Users
 export const getUsers = async (): Promise<User[]> => {
@@ -117,10 +129,10 @@ export const getUsers = async (): Promise<User[]> => {
 export const getBankAccounts = async (): Promise<BankAccount[]> => {
   try {
     //เรียก ร่างจาก category backend > bankAccounts Frontend
-    const categories = await getCatagories('ASSET');
+    const categories = await getCategories('ASSET');
     return categories.map(cat => ({
       id: cat.id,
-      account_number: cat.accout_type, // สมมติว่าเก็บเลขบัญชีใน accout_type
+      account_number: cat.account_code, // สมมติว่าเก็บเลขบัญชีใน account_code
       account_name: cat.name_th,
       bank_name: 'Unknown Bank' // เนื่องจากไม่มีข้อมูลธนาคารใน Category
     }));
