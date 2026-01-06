@@ -48,21 +48,39 @@ const NavButton: React.FC<NavButtonProps> = ({ item, isActive, onClick }) => (
   </button>
 );
 
-const UserProfile: React.FC = () => (
-  <div className="bg-sky-500 dark:bg-sky-800 rounded-xl p-4 flex items-center gap-3 shadow-inner">
-    <div className="w-12 h-12 rounded-full overflow-hidden bg-white border-2 border-white/50 dark:border-sky-600">
-      <img
-        src="https://picsum.photos/seed/user123/100"
-        alt="User"
-        className="w-full h-full object-cover"
-      />
+const UserProfile: React.FC = () => {
+  const [user, setUser] = React.useState<{ name: string; position?: string } | null>(null);
+
+  React.useEffect(() => {
+    const savedUser = localStorage.getItem('user');
+    if (savedUser) {
+      try {
+        setUser(JSON.parse(savedUser));
+      } catch (e) {
+        console.error("Failed to parse user from local storage", e);
+      }
+    }
+  }, []);
+
+  const displayName = user?.name || 'Guest User';
+  const displayPosition = user?.position || 'Staff';
+
+  return (
+    <div className="bg-sky-500 dark:bg-sky-800 rounded-xl p-4 flex items-center gap-3 shadow-inner">
+      <div className="w-12 h-12 rounded-full overflow-hidden bg-white border-2 border-white/50 dark:border-sky-600">
+        <img
+          src="https://picsum.photos/seed/user123/100"
+          alt="User"
+          className="w-full h-full object-cover"
+        />
+      </div>
+      <div className="flex-1 overflow-hidden">
+        <h3 className="text-sm font-bold text-slate-900 dark:text-white truncate">{displayName}</h3>
+        <p className="text-xs text-blue-900 dark:text-sky-200 font-medium">{displayPosition}</p>
+      </div>
     </div>
-    <div className="flex-1 overflow-hidden">
-      <h3 className="text-sm font-bold text-slate-900 dark:text-white truncate">Tharatep Khanbanjong</h3>
-      <p className="text-xs text-blue-900 dark:text-sky-200 font-medium">จัดการบัญชี</p>
-    </div>
-  </div>
-);
+  );
+};
 
 interface SidebarProps {
   activeView: ViewType;

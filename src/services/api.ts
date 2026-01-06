@@ -2,7 +2,7 @@ import axios from 'axios';
 import { Category, CasePayload, CaseResponse, User, BankAccount } from '../../types';
 
 // --- CONFIGURATION ---
-const API_BASE_URL = 'https://backend-api-886029565568.asia-southeast1.run.app/api/v1';
+const API_BASE_URL = '/api/v1';
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
@@ -48,6 +48,7 @@ export interface SignupPayload {
   email: string;
   password: string;
   name: string;
+  position: string;
 }
 
 export interface AuthResponse {
@@ -58,6 +59,7 @@ export interface AuthResponse {
       user_id: string;
       email: string;
       name: string;
+      position?: string;
     };
   };
 }

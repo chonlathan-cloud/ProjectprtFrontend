@@ -4,6 +4,7 @@ import { Sidebar } from './src/components/Sidebar';
 import { Dashboard } from './src/components/Dashboard';
 import { ChatView } from './src/components/ChatView';
 import { LoginForm } from './src/components/LoginForm';
+import { SignUpForm } from './src/components/SignUpForm';
 import { Form } from './src/components/Form';
 import { ViewType } from './types';
 import { AdminApproval } from './src/components/AdminApproval';
@@ -13,6 +14,7 @@ const App: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [currentView, setCurrentView] = useState<ViewType>(ViewType.DASHBOARD);
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const [isSigningUp, setIsSigningUp] = useState(false);
 
   useEffect(() => {
     // Check local storage for theme preference or system preference
@@ -60,7 +62,20 @@ const App: React.FC = () => {
   };
 
   if (!isAuthenticated) {
-    return <LoginForm onLogin={handleLogin} />;
+    if (isSigningUp) {
+      return (
+        <SignUpForm 
+          onSwitchToLogin={() => setIsSigningUp(false)} 
+          onSignUpSuccess={() => setIsSigningUp(false)} 
+        />
+      );
+    }
+    return (
+      <LoginForm 
+        onLogin={handleLogin} 
+        onSwitchToSignUp={() => setIsSigningUp(true)} 
+      />
+    );
   }
 
   return (
