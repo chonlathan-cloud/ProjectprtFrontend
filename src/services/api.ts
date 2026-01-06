@@ -48,13 +48,13 @@ export interface SignupPayload {
   email: string;
   password: string;
   name: string;
-  position: string;
+  position?: string;
 }
 
 export interface AuthResponse {
   success: boolean;
   data: {
-    accessToken: string;
+    access_token: string;
     user: {
       user_id: string;
       email: string;
