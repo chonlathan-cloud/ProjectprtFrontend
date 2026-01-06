@@ -1,11 +1,10 @@
 import axios from 'axios';
 import { Category, CasePayload, CaseResponse, User, BankAccount } from '../../types';
-
+const BASE_URL = import.meta.env.VITE_API_URL || '';
+const API_BASE_URL = `${BASE_URL}/api/v1`;
 // --- CONFIGURATION ---
-const API_BASE_URL = '/api/v1';
-
 export const api = axios.create({
-  baseURL: API_BASE_URL,
+  baseURL: `${BASE_URL}/api/v1`, // ต่อท้ายด้วย /api/v1 เสมอ
   headers: {
     'Content-Type': 'application/json',
   },
