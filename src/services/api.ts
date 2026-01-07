@@ -63,6 +63,25 @@ export interface AuthResponse {
   };
 }
 
+export interface ChatResponse {
+  reply: string;
+}
+
+// [NEW] ฟังก์ชันสำหรับคุยกับ AI ผ่าน Backend
+export const chatWithAI = async (message: string): Promise<string> => {
+  try {
+    // ยิง POST ไปที่ /api/v1/chat
+    // สังเกตว่าเราส่งไปแค่ { message: "ข้อความ" }
+    const response = await api.post('/chat', { message }); 
+    
+    // Backend จะส่งกลับมาเป็น { "reply": "คำตอบจาก AI..." }
+    return response.data.reply;
+  } catch (error) {
+    console.error("Chat API Error:", error);
+    return "ขออภัยครับ ไม่สามารถติดต่อเซิร์ฟเวอร์ได้ในขณะนี้ (Backend Error)";
+  }
+};
+
 // API Calls
 export const login = async (payload: LoginPayload): Promise<AuthResponse> => {
   const response = await api.post('/auth/login', payload);
