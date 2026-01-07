@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, Bot, User, Loader2 } from 'lucide-react';
-import { generateFinancialAdvice } from '../services/gemini';
+import { chatWithAI } from '../services/api';
 
 interface Message {
   role: 'user' | 'model';
@@ -9,9 +9,9 @@ interface Message {
 }
 
 export const ChatView: React.FC = () => {
-  const [messages, setMessages] = useState<Message[]>([
+  const [messages, setMessages] = useState<Message[]>(([
     { role: 'model', content: 'สวัสดีครับ! ผมคือผู้ช่วย AI ด้านการเงินของคุณ มีอะไรให้ช่วยวางแผนการเงินในวันนี้ไหมครับ?' }
-  ]);
+  ]));
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -30,9 +30,17 @@ export const ChatView: React.FC = () => {
     setInput('');
     setIsLoading(true);
 
-    const response = await generateFinancialAdvice([...messages, userMsg]);
-    setMessages(prev => [...prev, { role: 'model', content: response }]);
-    setIsLoading(false);
+    try {
+      // [CHANGE] เรียกใช้ API ของเราเอง แทนการเรียก Gemini โดยตรง
+      // ไม่ต้องส่ง history ทั้งหมดไป เพราะ Backend เราจัดการ context หรือรับแค่ message ล่าสุดในเฟสแรก
+      const responseText = await chatWithAI(input);
+
+      setMessages(prev => [...prev, { role: 'model', content: responseText }]);
+    } catch (error) {
+      setMessages(prev => [...prev, { role: 'model', content: "เกิดข้อผิดพลาดในการเชื่อมต่อ" }]);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
