@@ -7,7 +7,7 @@ import { LoginForm } from './src/components/LoginForm';
 import { SignUpForm } from './src/components/SignUpForm';
 import { Form } from './src/components/Form';
 import { ViewType } from './types';
-import { AdminApproval } from './src/components/AdminApproval';
+import  AdminApproval  from './src/components/AdminApproval';
 import { View } from 'lucide-react';
 
 const App: React.FC = () => {

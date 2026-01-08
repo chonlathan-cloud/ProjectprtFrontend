@@ -138,6 +138,11 @@ export const approveCase = async (caseId: string): Promise<WorkflowResponse> => 
   const response = await api.post(`/cases/${caseId}/approve`);
   return response.data;
 };
+// [NEW] เพิ่มฟังก์ชันสำหรับ Reject/Cancel
+export const rejectCase = async (caseId: string, reason: string = ""): Promise<WorkflowResponse> => {
+  const response = await api.post(`/cases/${caseId}/reject`, { note: reason });
+  return response.data;
+};
 
 // Fetch Users
 export const getUsers = async (): Promise<User[]> => {
