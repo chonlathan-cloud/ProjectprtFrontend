@@ -76,7 +76,7 @@ export const AdminApproval: React.FC = () => {
         <table className="min-w-full bg-white border rounded-lg shadow">
           <thead className="bg-gray-100">
             <tr>
-              <th className="py-3 px-4 text-left border-b">Case No.</th>
+              <th className="py-3 px-4 text-left border-b">Doc No.</th>
               <th className="py-3 px-4 text-left border-b">ผู้ขอเบิก</th>
               <th className="py-3 px-4 text-left border-b">รายละเอียด</th>
               <th className="py-3 px-4 text-right border-b">จำนวนเงิน</th>
@@ -94,7 +94,7 @@ export const AdminApproval: React.FC = () => {
                 <tr key={item.id} className="hover:bg-gray-50">
                   {/* แสดง Case No (Doc No จะมาหลังอนุมัติ) */}
                   <td className="py-3 px-4 border-b font-mono text-blue-600">
-                    {item.case_no}
+                    {item.doc_no || item.case_no}
                   </td>
                   
                   <td className="py-3 px-4 border-b">
