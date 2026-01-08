@@ -6,6 +6,7 @@ import { ChatView } from './src/components/ChatView';
 import { LoginForm } from './src/components/LoginForm';
 import { SignUpForm } from './src/components/SignUpForm';
 import { Form } from './src/components/Form';
+import { Insights } from './src/components/Insights';
 import { ViewType } from './types';
 
 const App: React.FC = () => {
@@ -48,6 +49,8 @@ const App: React.FC = () => {
         return <ChatView />;
       case ViewType.FORM:
         return <Form />;
+      case ViewType.INSIGHTS:
+        return <Insights />;
       default:
         return (
           <div className="flex items-center justify-center h-full">

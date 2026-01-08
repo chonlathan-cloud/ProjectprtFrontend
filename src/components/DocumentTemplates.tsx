@@ -13,6 +13,7 @@ export interface DocumentData {
   department?: string;
   subject?: string;
   purpose?: string;
+  psNo?: string;
   items: Array<{
     id: string;
     description: string;
@@ -31,7 +32,7 @@ export const PaymentVoucherTemplate = forwardRef<HTMLDivElement, { data: Documen
   }, 0);
 
   return (
-    <div ref={ref} className="bg-white p-12 text-black text-sm font-serif relative" style={{ width: '210mm', minHeight: '297mm' }}>
+    <div ref={ref} className="bg-white p-12 text-black text-[13pt] relative" style={{ width: '210mm', minHeight: '297mm', fontFamily: "'Sarabun', sans-serif", lineHeight: '1.5' }}>
       <div className="text-center mb-2">
         <h1 className="text-lg font-bold">บันทึกข้อความ</h1>
         <h2 className="text-base font-bold">ใบเบิกเงิน (Payment Voucher)</h2>
@@ -49,7 +50,11 @@ export const PaymentVoucherTemplate = forwardRef<HTMLDivElement, { data: Documen
         <p>132 ถนนสุขุมวิท 101 แขวงบางจาก เขตพระโขนง กรุงเทพฯ 10260</p>
       </div>
 
-      <div className="flex justify-end mb-6">
+      <div className="flex justify-between items-end mb-6">
+        <div className="flex gap-1">
+          <span className="font-bold">ปส 03011007/</span>
+          <span className="border-b border-black border-dotted min-w-[80px] text-center">{data.psNo || '..........'}</span>
+        </div>
         <span>{data.date} {data.month} {data.year}</span>
       </div>
 
@@ -127,7 +132,7 @@ export const ReceiveVoucherTemplate = forwardRef<HTMLDivElement, { data: Documen
   }, 0);
 
   return (
-    <div ref={ref} className="bg-white p-12 text-black text-sm font-serif relative" style={{ width: '210mm', minHeight: '297mm' }}>
+    <div ref={ref} className="bg-white p-12 text-black text-[13pt] relative" style={{ width: '210mm', minHeight: '297mm', fontFamily: "'Sarabun', sans-serif", lineHeight: '1.5' }}>
       <div className="text-center mb-2">
         <h1 className="text-lg font-bold">บันทึกข้อความ</h1>
         <h2 className="text-base font-bold">ใบรับเงิน (Receive Voucher)</h2>
@@ -223,7 +228,7 @@ export const JournalVoucherTemplate = forwardRef<HTMLDivElement, { data: Documen
   }, 0);
 
   return (
-    <div ref={ref} className="bg-white p-12 text-black text-sm font-serif relative" style={{ width: '210mm', minHeight: '297mm' }}>
+    <div ref={ref} className="bg-white p-12 text-black text-[13pt] relative" style={{ width: '210mm', minHeight: '297mm', fontFamily: "'Sarabun', sans-serif", lineHeight: '1.5' }}>
       <div className="text-center mb-2">
         <h1 className="text-lg font-bold">บันทึกข้อความ</h1>
         <h2 className="text-base font-bold">ใบสำคัญรายวันทั่วไป (Journal Voucher)</h2>
