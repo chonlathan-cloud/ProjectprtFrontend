@@ -68,7 +68,10 @@ export const ChatView: React.FC = () => {
                   msg.role === 'user' 
                   ? 'bg-blue-600 text-white rounded-tr-none' 
                   : 'bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-100 dark:border-slate-700 rounded-tl-none'
-                }`}>
+                }`}
+                // ให้ ai ตอบข้อความให้มีการเว้นบรรทัด
+                style={{ whiteSpace: 'pre-wrap' }}
+                >
                   {msg.content}
                 </div>
               </div>
