@@ -208,10 +208,13 @@ export const getBankAccounts = async (): Promise<BankAccount[]> => {
 };
 
 // Fetch Insights Data
-export const getInsights = async (userId?: string, month?: string): Promise<InsightsData> => {
+export const getInsights = async (username?: string, month?: number, year?: number): Promise<InsightsData> => {
   const params = new URLSearchParams();
-  if (userId) params.append('user_id', userId);
-  if (month) params.append('month', month);
+  
+  // ส่ง query param: user_id (แต่ค่าคือ username ตามที่คุณขอ), month, year
+  if (username) params.append('user_id', username);
+  if (month) params.append('month', month.toString());
+  if (year) params.append('year', year.toString());
   
   const response = await api.get(`/insights?${params.toString()}`);
   return response.data.data;

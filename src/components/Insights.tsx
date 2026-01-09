@@ -7,6 +7,9 @@ const MONTHS = [
   'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
   'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'
 ];
+// 1. เพิ่มตัวแปร YEAR และ Helper
+const CURRENT_YEAR = new Date().getFullYear();
+const YEARS = [CURRENT_YEAR, CURRENT_YEAR - 1, CURRENT_YEAR - 2];
 
 const INITIAL_INSIGHTS: InsightsData = {
   summary: {
@@ -26,7 +29,9 @@ export const Insights: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [dataLoading, setDataLoading] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState<string>('');
-  const [selectedMonth, setSelectedMonth] = useState<string>(MONTHS[new Date().getMonth()]);
+  const [selectedUsername, setSelectedUsername] = useState<string>(''); 
+  const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth() + 1); // 1-12
+  const [selectedYear, setSelectedYear] = useState<number>(CURRENT_YEAR);
 
   useEffect(() => {
     const fetchUsers = async () => {
@@ -46,7 +51,8 @@ export const Insights: React.FC = () => {
     const fetchInsightsData = async () => {
       setDataLoading(true);
       try {
-        const result = await getInsights(selectedUserId, selectedMonth);
+        // ส่งเป็น year, month (number), username
+        const result = await getInsights(selectedUsername, selectedMonth, selectedYear);
         if (result) {
           setInsights(result);
         }
@@ -57,7 +63,7 @@ export const Insights: React.FC = () => {
       }
     };
     fetchInsightsData();
-  }, [selectedUserId, selectedMonth]);
+  }, [selectedUsername, selectedMonth, selectedYear]); // Dependency เปลี่ยน
 
   const getCreatorName = (userId: string) => {
     const user = users.find(u => u.user_id === userId);
@@ -83,13 +89,13 @@ export const Insights: React.FC = () => {
         <div className="flex flex-wrap gap-3">
           <div className="relative">
             <select 
-              value={selectedUserId}
-              onChange={(e) => setSelectedUserId(e.target.value)}
+              value={selectedUsername}
+              onChange={(e) => setSelectedUsername(e.target.value)}
               className="pl-4 pr-10 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-100 bg-white text-sm font-medium text-slate-700 appearance-none cursor-pointer"
             >
               <option value="">ผู้ทำรายการทั้งหมด</option>
               {users.map(u => (
-                <option key={u.user_id} value={u.user_id}>{u.name}</option>
+                <option key={u.user_id} value={u.name}>{u.name}</option>
               ))}
             </select>
             <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
@@ -102,7 +108,7 @@ export const Insights: React.FC = () => {
           <div className="relative">
             <select 
               value={selectedMonth}
-              onChange={(e) => setSelectedMonth(e.target.value)}
+              onChange={(e) => setSelectedMonth(Number(e.target.value))}
               className="pl-4 pr-10 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-100 bg-white text-sm font-medium text-slate-700 appearance-none cursor-pointer"
             >
               {MONTHS.map(m => (
@@ -115,7 +121,23 @@ export const Insights: React.FC = () => {
               </svg>
             </div>
           </div>
-
+          <div className="relative">
+            <select 
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(Number(e.target.value))}
+              className="pl-4 pr-10 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-100 bg-white text-sm font-medium text-slate-700 appearance-none cursor-pointer"
+            >
+              {YEARS.map(y => (
+                <option key={y} value={y}>{y}</option>
+              ))}
+            </select>
+            <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                <path d="M2.5 4.5L6 8L9.5 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </div>
+          </div>    
+          
           <button className="p-2 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors bg-white">
             <Filter className="w-5 h-5 text-slate-600" />
           </button>
