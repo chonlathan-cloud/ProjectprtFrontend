@@ -6,6 +6,7 @@ import { ChatView } from './src/components/ChatView';
 import { LoginForm } from './src/components/LoginForm';
 import { SignUpForm } from './src/components/SignUpForm';
 import { Form } from './src/components/Form';
+import { Insights } from './src/components/Insights';
 import { ViewType } from './types';
 import  AdminApproval  from './src/components/AdminApproval';
 import { View } from 'lucide-react';
@@ -50,8 +51,8 @@ const App: React.FC = () => {
         return <ChatView />;
       case ViewType.FORM:
         return <Form />;
-      case ViewType.ADMIN_APPROVAL:
-        return <AdminApproval />;
+      case ViewType.INSIGHTS:
+        return <Insights />;
       default:
         return (
           <div className="flex items-center justify-center h-full">

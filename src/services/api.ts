@@ -37,6 +37,25 @@ export interface DashboardData {
   latestTransactions: Array<{ id: string; initial: string; name: string; description: string; amount: number }>;
 }
 
+export interface InsightsData {
+  summary: {
+    normal_count: number;
+    normal_amount: number;
+    pending_count: number;
+    pending_amount: number;
+    approved_count: number;
+    approved_amount: number;
+  };
+  transactions: Array<{
+    id: string;
+    doc_no: string;
+    date: string;
+    creator_id: string;
+    user_code: string;
+    purpose: string;
+  }>;
+}
+
 // --- AUTH TYPES ---
 export interface LoginPayload {
   email: string;
@@ -52,6 +71,12 @@ export interface SignupPayload {
 
 export interface AuthResponse {
   success: boolean;
+  message?: string;
+  error?: {
+    code: string;
+    message: string;
+    details: any;
+  };
   data: {
     access_token: string;
     user: {
@@ -63,6 +88,21 @@ export interface AuthResponse {
   };
 }
 
+// Interceptor to handle HTML responses (Proxy failure)
+api.interceptors.response.use(
+  (response) => {
+    // Check if we got HTML instead of JSON
+    if (typeof response.data === 'string' && response.data.trim().startsWith('<')) {
+      const error = new Error('Invalid API Response: Received HTML. Check API Base URL or Proxy configuration.');
+      (error as any).isHtmlError = true;
+      return Promise.reject(error);
+    }
+    return response;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
 export interface ChatResponse {
   reply: string;
 }
@@ -152,6 +192,24 @@ export const getUsers = async (): Promise<User[]> => {
 
 // Fetch Bank Accounts
 export const getBankAccounts = async (): Promise<BankAccount[]> => {
+  const response = await api.get('/bank-accounts/'); // Assuming this endpoint
+  return Array.isArray(response.data) ? response.data : (response.data.data || []);
+};
+
+// Fetch Insights Data
+export const getInsights = async (userId?: string, month?: string): Promise<InsightsData> => {
+  const params = new URLSearchParams();
+  if (userId) params.append('user_id', userId);
+  if (month) params.append('month', month);
+  
+  const response = await api.get(`/insights?${params.toString()}`);
+  return response.data.data;
+};
+
+// Search Documents by Doc No (for JV Consolidation)
+export const searchDocumentsByNo = async (docNo: string): Promise<any[]> => {
+  const response = await api.get(`/cases/search?doc_no=${encodeURIComponent(docNo)}`);
+  return Array.isArray(response.data) ? response.data : (response.data.data || []);
   try {
     //เรียก ร่างจาก category backend > bankAccounts Frontend
     const categories = await getCategories('ASSET');

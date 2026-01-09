@@ -44,12 +44,17 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ onSignUpSuccess, onSwitc
       if (response.success) {
         onSignUpSuccess();
       } else {
-        setError('Sign up failed. Please try again.');
+        const errorMessage = response.error?.message || response.message || 'Sign up failed. Please try again.';
+        setError(errorMessage);
       }
     } catch (err: any) {
       console.error("Sign Up Error:", err);
-      if (err.response && err.response.data && err.response.data.message) {
+      if (err.isHtmlError) {
+        setError(err.message);
+      } else if (err.response && err.response.data && err.response.data.message) {
         setError(err.response.data.message);
+      } else if (err.response && err.response.data && err.response.data.error && err.response.data.error.message) {
+        setError(err.response.data.error.message);
       } else {
         setError('Something went wrong. Please check your connection.');
       }
@@ -65,11 +70,11 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ onSignUpSuccess, onSwitc
         <div className="bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-200 backdrop-blur-sm">
           
           <div className="p-8 text-center border-b border-gray-100">
-             <div className="flex w-full justify-center items-center mb-6 transition-transform hover:scale-105 duration-300 translate-x-4">
-               <img src="/prt-logo.png" alt="PRT Logo" className="h-12 w-auto object-contain" />
+             <div className="flex w-full justify-center items-center mb-6 transition-transform hover:scale-105 duration-300">
+               <img src="/metta-logo.png" alt="METTA Logo" className="h-24 w-auto object-contain" />
              </div>
             <h1 className="text-2xl font-bold text-gray-900 mb-2 tracking-tight">Create Account</h1>
-            <p className="text-gray-500 text-sm">Join PRT today</p>
+            <p className="text-gray-500 text-sm">Join METTA today</p>
           </div>
 
           <div className="p-8 space-y-6">
@@ -218,7 +223,7 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ onSignUpSuccess, onSwitc
           
           <div className="px-8 py-4 bg-gray-50 border-t border-gray-100 text-center">
             <p className="text-xs text-gray-500">
-              Project PRT &copy; 2025
+              Project METTA &copy; 2025
             </p>
           </div>
         </div>

@@ -7,7 +7,7 @@ import {
 import { PaymentVoucherTemplate, ReceiveVoucherTemplate, JournalVoucherTemplate, DocumentData } from './DocumentTemplates';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
-import { createCase, submitCase, getCategories, getUsers, getBankAccounts } from '../services/api'; // Import API
+import { createCase, submitCase, getCategories, getUsers, getBankAccounts, searchDocumentsByNo } from '../services/api'; // Import API
 import { Category, User, BankAccount } from '../../types'; // Import Types
 
 const INITIAL_DATA: DocumentData = {
@@ -23,6 +23,7 @@ const INITIAL_DATA: DocumentData = {
   department: '',
   subject: '',
   purpose: '',
+  psNo: '',
   items: [
     { id: '1', description: '', quantity: '', unit: '', price: '', refNo: '' }
   ]
@@ -35,8 +36,13 @@ export const Form: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
-  const [transactionType, setTransactionType] = useState<'EXPENSE' | 'REVENUE'>('EXPENSE');
-  const [selectedBankAccountId, setSelectedBankAccountId] = useState<string>('');
+  const [transactionType, setTransactionType] = useState<'EXPENSE' | 'INCOME'>('EXPENSE');
+  
+  // JV Consolidation States
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [isSearchingDocs, setIsSearchingDocs] = useState(false);
+ 
   const printRef = useRef<HTMLDivElement>(null);
 
   // 1. โหลดข้อมูลเมื่อเข้าหน้า Form
@@ -199,6 +205,45 @@ export const Form: React.FC = () => {
     }
   };
 
+  // 3. Logic การค้นหาและดึงข้อมูลเอกสาร (Consolidation)
+  const handleSearchDocs = async () => {
+    if (!searchQuery.trim()) return;
+    setIsSearchingDocs(true);
+    try {
+      const results = await searchDocumentsByNo(searchQuery);
+      setSearchResults(results);
+      if (results.length === 0) {
+        alert("ไม่พบเอกสารที่ระบุ");
+      }
+    } catch (error) {
+      console.error("Search failed:", error);
+      alert("เกิดข้อผิดพลาดในการค้นหา");
+    } finally {
+      setIsSearchingDocs(false);
+    }
+  };
+
+  const pullDocumentData = (doc: any) => {
+    // ดึงค่ารายการสินค้า (Items)
+    // หมายเหตุ: mapping field ตามโครงสร้าง data จาก backend
+    const pulledItems = (doc.items || []).map((item: any) => ({
+      id: Date.now().toString() + Math.random().toString(36).substring(2, 11),
+      description: item.description || item.purpose || '',
+      quantity: item.quantity || '1',
+      unit: item.unit || 'รายการ',
+      price: item.price || item.amount || '0',
+      refNo: doc.doc_no || doc.case_no || ''
+    }));
+
+    setData(prev => ({
+      ...prev,
+      items: [...prev.items.filter(i => i.description !== ''), ...pulledItems]
+    }));
+    
+    // แจ้งเตือนเล็กน้อย
+    alert(`ดึงข้อมูลจาก ${doc.doc_no || doc.case_no} เรียบร้อยแล้ว`);
+  };
+
   const generatePDF = async (action: 'submit' | 'download') => {
     // ถ้ากด Submit ให้ Save ลง Backend ก่อน
     if (action === 'submit') {
@@ -212,16 +257,20 @@ export const Form: React.FC = () => {
     if (!printRef.current) return;
 
     try {
+      // Ensure fonts are loaded before capturing
+      await document.fonts.ready;
+      
       const canvas = await html2canvas(printRef.current, {
-        scale: 4, 
+        scale: 3, // 3 is usually enough and more stable than 4
         useCORS: true,
         logging: false,
         backgroundColor: '#ffffff',
-        windowWidth: 794,
+        windowWidth: 1200, // Wider window for better layout stability during capture
         onclone: (clonedDoc) => {
           const element = clonedDoc.querySelector('.transform.scale-90');
           if (element instanceof HTMLElement) {
             element.style.transform = 'none';
+            element.style.fontFamily = "'Sarabun', sans-serif";
           }
         }
       } as any);
@@ -278,6 +327,28 @@ export const Form: React.FC = () => {
             <div className="space-y-6 flex-1 overflow-y-auto pr-2 custom-scrollbar">
               
               {/* --- 1. Category Dropdown (เพิ่มใหม่ตาม Requirement) --- */}
+              {/* --- 1.ลักษณะเอกสาร (Moved to Top) --- */}
+              <div>
+                <label className={labelStyle}>ลักษณะเอกสาร</label>
+                <div className="relative">
+                  <select 
+                    className={`${inputStyle} appearance-none cursor-pointer`}
+                    value={data.type}
+                    onChange={(e) => handleInputChange('type', e.target.value)}
+                  >
+                    <option value="pv">ใบเบิกเงิน (Payment Voucher - PV)</option>
+                    <option value="rv">ใบรับเงิน (Receive Voucher - RV)</option>
+                    <option value="jv">ใบสำคัญรายวันทั่วไป (Journal Voucher - JV)</option>
+                  </select>
+                  <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-500">
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M2.5 4.5L6 8L9.5 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  </div>
+                </div>
+              </div>
+
+              {/* --- 2. หมวดหมู่บัญชี (Moved below Document Style) --- */}
               <div>
                 <label className={labelStyle}>หมวดหมู่บัญชี (Category) <span className="text-red-500">*</span></label>
                 <div className="relative">
@@ -298,47 +369,52 @@ export const Form: React.FC = () => {
                   </div>
                 </div>
               </div>
-              {/* ---------------------------------------------------- */}
 
-              {/* --- Transaction Type Dropdown --- */}
-              <div>
-                <label className={labelStyle}>ประเภทรายการ</label>
-                <div className="relative">
-                  <select 
-                    className={`${inputStyle} appearance-none cursor-pointer border-indigo-200 bg-indigo-50`}
-                    value={transactionType}
-                    onChange={(e) => setTransactionType(e.target.value as 'EXPENSE' | 'REVENUE')}
-                  >
-                    <option value="EXPENSE">รายจ่าย (Expense)</option>
-                    <option value="REVENUE">รายรับ (Revenue)</option>
-                  </select>
-                  <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-500">
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M2.5 4.5L6 8L9.5 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
+              {/* --- 3. JV Document Consolidation Search (Show only for JV) --- */}
+              {data.type === 'jv' && (
+                <div className="p-5 bg-blue-50/50 border border-blue-100 rounded-2xl space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                  <label className="text-sm font-black text-blue-700 flex items-center gap-2">
+                    <Search className="w-4 h-4" />
+                    ดึงข้อมูลเอกสารเพื่อรวมใบเดียว (Consolidate)
+                  </label>
+                  <div className="flex gap-2">
+                    <input 
+                      type="text" 
+                      className={`${inputStyle} bg-white border-blue-200`}
+                      placeholder="กรอกเลขที่ ปส... (เช่น ปส.2567/001)"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleSearchDocs()}
+                    />
+                    <button 
+                      onClick={handleSearchDocs}
+                      disabled={isSearchingDocs}
+                      className="px-6 bg-blue-600 text-white rounded-xl font-bold text-sm hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center shrink-0"
+                    >
+                      {isSearchingDocs ? <Loader2 className="w-4 h-4 animate-spin" /> : 'ค้นหา'}
+                    </button>
                   </div>
-                </div>
-              </div>
 
-              <div>
-                <label className={labelStyle}>ลักษณะเอกสาร</label>
-                <div className="relative">
-                  <select 
-                    className={`${inputStyle} appearance-none cursor-pointer`}
-                    value={data.type}
-                    onChange={(e) => handleInputChange('type', e.target.value)}
-                  >
-                    <option value="pv">ใบเบิกเงิน (Payment Voucher - PV)</option>
-                    <option value="rv">ใบรับเงิน (Receive Voucher - RV)</option>
-                    <option value="jv">ใบสำคัญรายวันทั่วไป (Journal Voucher - JV)</option>
-                  </select>
-                  <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-500">
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M2.5 4.5L6 8L9.5 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                  </div>
+                  {searchResults.length > 0 && (
+                    <div className="space-y-2 mt-4 max-h-40 overflow-y-auto pr-2 custom-scrollbar">
+                      {searchResults.map((res) => (
+                        <div key={res.id || res.case_no || Math.random()} className="flex justify-between items-center p-3 bg-white border border-blue-100 rounded-xl shadow-sm hover:border-blue-300 transition-colors">
+                          <div className="overflow-hidden">
+                            <p className="text-xs font-black text-slate-800 truncate">{res.doc_no || res.case_no}</p>
+                            <p className="text-[10px] text-slate-500 truncate">{res.purpose}</p>
+                          </div>
+                          <button 
+                            onClick={() => pullDocumentData(res)}
+                            className="px-3 py-1.5 bg-blue-100 text-blue-700 rounded-lg text-[10px] font-black hover:bg-blue-200 transition-colors shrink-0 ml-2"
+                          >
+                            ดึงข้อมูล (Pull)
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
-              </div>
+              )}
 
               {/* Date Selection Block (เหมือนเดิม) */}
               <div className="grid grid-cols-1 gap-4">
@@ -424,6 +500,24 @@ export const Form: React.FC = () => {
                       </div>
                     </div>
                   </div>
+               )}
+
+               {/* PS No for PV */}
+               {data.type === 'pv' && (
+                 <div>
+                   <label htmlFor="psNo" className={labelStyle}>เลขที่ ปส (ปส 03011007/...)</label>
+                   <div className="flex items-center gap-2">
+                     <span className="text-sm font-bold text-gray-500 shrink-0">ปส 03011007/</span>
+                     <input 
+                      id="psNo"
+                      type="text" 
+                      className={inputStyle}
+                      value={data.psNo}
+                      onChange={(e) => handleInputChange('psNo', e.target.value)}
+                      placeholder="กรอกเลขที่ต่อท้าย"
+                    />
+                   </div>
+                 </div>
                )}
 
               <div>
@@ -526,13 +620,17 @@ export const Form: React.FC = () => {
 
           {/* Right Side - Preview */}
           <div className="w-7/12 flex flex-col gap-6">
-             <div className="flex-1 bg-gray-100 rounded-3xl overflow-hidden shadow-inner p-8 flex items-start justify-center overflow-y-auto">
-                <div className="transform scale-90 origin-top shadow-xl">
-                 {data.type === 'pv' && <PaymentVoucherTemplate ref={printRef} data={data} />}
-                 {data.type === 'rv' && <ReceiveVoucherTemplate ref={printRef} data={data} />}
-                 {data.type === 'jv' && <JournalVoucherTemplate ref={printRef} data={data} />}
-               </div>
-             </div>
+              <div className="flex-1 bg-gray-100 rounded-3xl overflow-hidden shadow-inner p-8 flex items-start justify-center overflow-y-auto">
+                <div className="transform scale-90 origin-top shadow-xl bg-white" style={{ 
+                  WebkitFontSmoothing: 'antialiased',
+                  MozOsxFontSmoothing: 'grayscale',
+                  backfaceVisibility: 'hidden'
+                }}>
+                  {data.type === 'pv' && <PaymentVoucherTemplate ref={printRef} data={data} />}
+                  {data.type === 'rv' && <ReceiveVoucherTemplate ref={printRef} data={data} />}
+                  {data.type === 'jv' && <JournalVoucherTemplate ref={printRef} data={data} />}
+                </div>
+              </div>
 
              <div className="flex justify-between gap-4">
                 <button 

@@ -5,13 +5,14 @@ import {
   FileText, 
   Lightbulb, 
   TrendingUp, 
+  MessageSquare
   MessageSquare,
   Search,
   MoreHorizontal,
   CheckCircle
 } from 'lucide-react';
 import { ViewType } from '../../types';
-import mylogo from '../mylogo.png';
+
 
 interface SidebarProps {
   activeView: ViewType;
@@ -93,7 +94,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onViewChange }) =>
       {/* Logo Section */}
       <div className="p-8">
         <div className="flex items-center gap-2">
-          <img src={mylogo} alt="PRT Logo" className="w-32 h-20 object-contain" />
+          <img src="/metta-logo.png" alt="METTA Logo" className="w-24 h-auto object-contain" />
         </div>
       </div>
 

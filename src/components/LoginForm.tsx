@@ -24,20 +24,28 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLogin, onSwitchToSignUp 
       const response = await login({ email, password });
       console.log("Login Response Debug:", response);
 
-      if (response.success && response.data.access_token) {
+      if (response.success && response.data?.access_token) {
         localStorage.setItem('token', response.data.access_token);
         
         localStorage.setItem('user', JSON.stringify(response.data.user));
 
         onLogin();
       } else {
-        setError('Login failed. Please try again.');
+        // Show actual error from backend
+        const errorMessage = response.error?.message || response.message || 'Login failed. Please try again.';
+        setError(errorMessage);
       }
     } catch (err: any) {
       // 4. จัดการ Error (เช่น รหัสผิด หรือ Server ล่ม)
       console.error("Login Error:", err);
-      if (err.response && err.response.status === 401) {
-        setError('Invalid email or password.');
+      if (err.isHtmlError) {
+         setError(err.message);
+      } else if (err.response?.status === 401) {
+        // Sometimes 401 response has a message
+        const msg = err.response.data?.error?.message || err.response.data?.message || 'Invalid email or password.';
+        setError(msg);
+      } else if (err.response?.data?.message) {
+         setError(err.response.data.message);
       } else {
         setError('Something went wrong. Please check your connection.');
       }
@@ -53,11 +61,11 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLogin, onSwitchToSignUp 
         <div className="bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-200 backdrop-blur-sm">
           
           <div className="p-8 text-center border-b border-gray-100">
-            <div className="flex w-full justify-center items-center mb-6 transition-transform hover:scale-105 duration-300 translate-x-4">
-              <img src="/prt-logo.png" alt="PRT Logo" className="h-12 w-auto object-contain" />
+            <div className="flex w-full justify-center items-center mb-6 transition-transform hover:scale-105 duration-300">
+              <img src="/metta-logo.png" alt="METTA Logo" className="h-24 w-auto object-contain" />
             </div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-2 tracking-tight">Welcome PRT</h1>
-            <p className="text-gray-500 text-sm">Sign in to PRT</p>
+            <h1 className="text-2xl font-bold text-gray-900 mb-2 tracking-tight">Welcome METTA</h1>
+            <p className="text-gray-500 text-sm">Sign in to METTA</p>
           </div>
 
           <div className="p-8 space-y-6">
@@ -144,7 +152,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLogin, onSwitchToSignUp 
           
           <div className="px-8 py-4 bg-gray-50 border-t border-gray-100 text-center">
             <p className="text-xs text-gray-500">
-              Project PRT &copy; 2025
+              Project METTA &copy; 2025
             </p>
           </div>
         </div>
