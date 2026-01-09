@@ -216,7 +216,7 @@ export const getInsights = async (username?: string, month?: number, year?: numb
   if (month) params.append('month', month.toString());
   if (year) params.append('year', year.toString());
   
-  const response = await api.get(`/insights?${params.toString()}`);
+  const response = await api.get(`/insights/?${params.toString()}`);
   return response.data.data;
 };
 
