@@ -77,7 +77,7 @@ export const Insights: React.FC = () => {
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-3xl font-bold text-slate-800">Insights</h1>
-          <p className="text-slate-500 mt-1">รายการสืบค้นและวิเคราะห์ข้อมูลจาก Backend</p>
+          <p className="text-slate-500 mt-1">รายการสืบค้นและวิเคราะห์</p>
         </div>
         
         <div className="flex flex-wrap gap-3">
@@ -193,7 +193,7 @@ export const Insights: React.FC = () => {
                 <th className="px-6 py-4 text-xs font-black text-slate-500 uppercase tracking-widest border-b border-slate-100">เลขที่ใบ ปส</th>
                 <th className="px-6 py-4 text-xs font-black text-slate-500 uppercase tracking-widest border-b border-slate-100">วันเดือนปี</th>
                 <th className="px-6 py-4 text-xs font-black text-slate-500 uppercase tracking-widest border-b border-slate-100">ชื่อผู้ทำรายการ</th>
-                <th className="px-6 py-4 text-xs font-black text-slate-500 uppercase tracking-widest border-b border-slate-100">User_code</th>
+                <th className="px-6 py-4 text-xs font-black text-slate-500 uppercase tracking-widest border-b border-slate-100">จำนวนเงิน</th>
                 <th className="px-6 py-4 text-xs font-black text-slate-500 uppercase tracking-widest border-b border-slate-100">วัตถุประสงค์</th>
               </tr>
             </thead>
@@ -209,8 +209,8 @@ export const Insights: React.FC = () => {
                       <span className="text-sm font-bold text-slate-700">{getCreatorName(item.creator_id)}</span>
                     </td>
                     <td className="px-6 py-4">
-                      <span className="inline-flex items-center px-2.5 py-1 bg-slate-100 text-slate-600 rounded-lg text-[10px] font-black tracking-tighter">
-                        {item.user_code}
+                      <span className="inline-flex items-center px-2.5 py-1 bg-blue-50 text-blue-600 rounded-lg text-xs font-bold">
+                        {formatCurrency(item.amount)}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-sm text-slate-600 max-w-sm font-medium">
