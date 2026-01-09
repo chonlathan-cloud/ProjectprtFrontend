@@ -53,6 +53,14 @@ const App: React.FC = () => {
         return <Form />;
       case ViewType.INSIGHTS:
         return <Insights />;
+      case ViewType.ADMIN_APPROVAL:
+        return <AdminApproval />;
+      case ViewType.PROFIT_LOSS:
+         return (
+           <div className="flex items-center justify-center h-full">
+             <h2 className="text-2xl text-gray-400">Profit & Loss Component is under construction</h2>
+           </div>
+         );
       default:
         return (
           <div className="flex items-center justify-center h-full">

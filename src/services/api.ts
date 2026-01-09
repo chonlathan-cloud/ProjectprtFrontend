@@ -192,8 +192,19 @@ export const getUsers = async (): Promise<User[]> => {
 
 // Fetch Bank Accounts
 export const getBankAccounts = async (): Promise<BankAccount[]> => {
-  const response = await api.get('/bank-accounts/'); // Assuming this endpoint
-  return Array.isArray(response.data) ? response.data : (response.data.data || []);
+   try {
+    //เรียก ร่างจาก category backend > bankAccounts Frontend
+    const categories = await getCategories('ASSET');
+    return categories.map(cat => ({
+      id: cat.id,
+      account_number: cat.account_code || '-', // สมมติว่าเก็บเลขบัญชีใน account_code
+      account_name: cat.name_th,
+      bank_name: cat.name_th
+    }));
+  } catch (error) {
+    console.error("Error fetching bank accounts from categories:", error);
+    return [];
+  }
 };
 
 // Fetch Insights Data
@@ -210,17 +221,4 @@ export const getInsights = async (userId?: string, month?: string): Promise<Insi
 export const searchDocumentsByNo = async (docNo: string): Promise<any[]> => {
   const response = await api.get(`/cases/search?doc_no=${encodeURIComponent(docNo)}`);
   return Array.isArray(response.data) ? response.data : (response.data.data || []);
-  try {
-    //เรียก ร่างจาก category backend > bankAccounts Frontend
-    const categories = await getCategories('ASSET');
-    return categories.map(cat => ({
-      id: cat.id,
-      account_number: cat.account_code || '-', // สมมติว่าเก็บเลขบัญชีใน account_code
-      account_name: cat.name_th,
-      bank_name: cat.name_th
-    }));
-  } catch (error) {
-    console.error("Error fetching bank accounts from categories:", error);
-    return [];
-  }
 };

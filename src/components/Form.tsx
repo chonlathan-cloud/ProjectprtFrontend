@@ -42,8 +42,8 @@ export const Form: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearchingDocs, setIsSearchingDocs] = useState(false);
- 
   const printRef = useRef<HTMLDivElement>(null);
+  const [selectedBankAccountId, setSelectedBankAccountId] = useState<string>('');
 
   // 1. โหลดข้อมูลเมื่อเข้าหน้า Form
   useEffect(() => {
@@ -93,17 +93,29 @@ export const Form: React.FC = () => {
     fetchOtherData();
   }, [transactionType]);
 
+  useEffect(() => {
+    if (transactionType === 'INCOME' && categories.length > 0) {
+      // เลือกตัวแรกใน List ให้เลยอัตโนมัติ
+      setSelectedCategoryId(categories[0].id);
+    }
+  }, [categories, transactionType]);
+
   const handleInputChange = (field: keyof DocumentData, value: string) => {
     setData(prev => ({ ...prev, [field]: value }));
   };
 
   const handleItemChange = (id: string, field: string, value: string | number) => {
-    setData(prev => ({
-      ...prev,
-      items: prev.items.map(item => 
-        item.id === id ? { ...item, [field]: value } : item
-      )
-    }));
+    setData(prev => ({...prev,[field]: value}));
+
+    if (field === 'type') {
+      if (value === 'rv'){
+        setTransactionType('INCOME'); //income
+      } else {
+        setTransactionType('EXPENSE'); // Expense
+      }
+      setSelectedCategoryId('');
+      setSelectedBankAccountId('');
+    }
   };
 
   const addItem = () => {
@@ -130,7 +142,7 @@ export const Form: React.FC = () => {
 
   // 2. Logic การ Save ไป Backend
   const handleSaveToBackend = async () => {
-    if (!selectedCategoryId) {
+    if (data.type !== 're' && !selectedCategoryId) {
       alert("กรุณาเลือกหมวดหมู่บัญชี (Category) ก่อนบันทึก");
       return;
     }
@@ -349,6 +361,7 @@ export const Form: React.FC = () => {
               </div>
 
               {/* --- 2. หมวดหมู่บัญชี (Moved below Document Style) --- */}
+            {data.type !== "rv" && (
               <div>
                 <label className={labelStyle}>หมวดหมู่บัญชี (Category) <span className="text-red-500">*</span></label>
                 <div className="relative">
@@ -369,7 +382,7 @@ export const Form: React.FC = () => {
                   </div>
                 </div>
               </div>
-
+            )}
               {/* --- 3. JV Document Consolidation Search (Show only for JV) --- */}
               {data.type === 'jv' && (
                 <div className="p-5 bg-blue-50/50 border border-blue-100 rounded-2xl space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
