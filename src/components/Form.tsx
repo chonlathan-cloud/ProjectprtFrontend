@@ -42,7 +42,7 @@ export const Form: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearchingDocs, setIsSearchingDocs] = useState(false);
-  
+ 
   const printRef = useRef<HTMLDivElement>(null);
 
   // 1. โหลดข้อมูลเมื่อเข้าหน้า Form
@@ -74,11 +74,20 @@ export const Form: React.FC = () => {
     // C. ดึง Users และ Bank Accounts
     const fetchOtherData = async () => {
       try {
-        const [u, b] = await Promise.all([getUsers(), getBankAccounts()]);
+        const u = await getUsers();
         setUsers(u);
+      } catch (error) {
+        console.warn("⚠️ Warning: Could not fetch users (API not found or error)", error);
+        // ไม่ต้อง throw error ปล่อยให้ทำงานต่อ
+      }
+
+      // 2. ดึง Bank Accounts (หัวใจสำคัญของ RV)
+      try {
+        const b = await getBankAccounts();
+        console.log("✅ Bank Accounts fetched:", b); // เช็คใน Console ว่าข้อมูลมาไหม
         setBankAccounts(b);
       } catch (error) {
-        console.error("Error fetching other data:", error);
+        console.error("❌ Error fetching bank accounts:", error);
       }
     };
     fetchOtherData();
@@ -125,7 +134,11 @@ export const Form: React.FC = () => {
       alert("กรุณาเลือกหมวดหมู่บัญชี (Category) ก่อนบันทึก");
       return;
     }
-
+    // validation สำหรับ RV (ต้องเลือกบัญชีธนาคาร)
+    if (transactionType === 'INCOME' && !selectedBankAccountId) {
+        alert("กรุณาเลือกบัญชีธนาคาร/เงินสด ที่รับเงินเข้า")
+        return false;
+    }
     setIsSaving(true);
     try {
       // 2.1 คำนวณยอดรวม (Items vs Amount)
@@ -150,14 +163,19 @@ export const Form: React.FC = () => {
       // ถ้า finalPurpose ว่างจริงๆ ให้ใส่ default
       if (!finalPurpose.trim()) finalPurpose = "ค่าใช้จ่ายทั่วไป";
 
-      // 2.3 สร้าง Payload
-      const casePayload = {
+      // [CORE CHANGE] สร้าง Payload ส่ง Backend
+      const casePayload: any = {
         category_id: selectedCategoryId,
         requested_amount: totalAmount,
         purpose: finalPurpose,
-        department_id: data.department,
-        funding_type: 'OPERATING' as const,
+        department_id: data.department || null,
+        cost_center_id: null,
+        funding_type: 'OPERATING',
       };
+      // ถ้าเป็นรายร้บ (income/RV) ต้องส่งไปที่  deposit_account_id ด้วย
+      if (transactionType === 'INCOME') {
+        casePayload.deposit_account_id = selectedBankAccountId;
+      }
 
       console.log("Creating Case with:", casePayload);
 
@@ -167,13 +185,15 @@ export const Form: React.FC = () => {
       // 2.5 Call API Submit Case (ถ้าต้องการ Submit เลย)
       const submitResult = await submitCase(newCase.id);
 
-      // 2.6 อัปเดตเลขที่เอกสารในหน้าจอ
-      const finalDocNO = submitResult.doc_no || newCase.case_no;
+      // 3. Update Doc No
+      // หมายเหตุ: Backend ปัจจุบันจะให้เลข PV/RV ตอน 'Approve' เท่านั้น
+      // ดังนั้นตอนนี้เราจะโชว์ 'Case No' ไปก่อน หรือรอหน้า Finance Approve
+      const displayDocNo = submitResult.doc_no || newCase.case_no;
 
-      setData(prev => ({ ...prev, docNo: finalDocNO }));
+      setData(prev => ({ ...prev, docNo: displayDocNo }));
       
-      alert(`บันทึกสำเร็จ! ได้เลขที่เอกสาร: ${finalDocNO}`);
-      return true; // Return true บอกว่าสำเร็จ
+      alert(`บันทึกสำเร็จ! \nเลขที่อ้างอิง: ${displayDocNo} \n(สถานะ: รออนุมัติ/Submitted)`);
+      return true;
 
     } catch (error: any) {
       console.error('Save failed:', error);
@@ -453,12 +473,24 @@ export const Form: React.FC = () => {
                     <div className="relative">
                       <select 
                         className={`${inputStyle} appearance-none cursor-pointer`}
-                        value={data.bankAccount}
-                        onChange={(e) => handleInputChange('bankAccount', e.target.value)}
+                        value={selectedBankAccountId} // ใช้ เป็น ID เป็น Value 
+                        onChange={(e) => {
+                          const id = e.target.value;
+                          setSelectedBankAccountId(id);
+                          // หา Object เพื่อเอาชื่อมาโชว์ใน Preview Template
+                          const account = bankAccounts.find(b => b.id === id);
+                          if (account) {
+                            // Update display text for Template
+                            const displayText = `${account.bank_name} - ${account.account_number}`;
+                            handleInputChange('bankAccount', displayText); 
+                          }
+                        }}
                       >
                         <option value="">-- เลือกเลขที่บัญชี --</option>
                         {bankAccounts.map(b => (
-                          <option key={b.id} value={b.account_number}>{b.bank_name} - {b.account_number} ({b.account_name})</option>
+                          <option key={b.id} value={b.id}>
+                            {b.bank_name} - {b.account_number}
+                          </option>
                         ))}
                       </select>
                       <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-500">

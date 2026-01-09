@@ -22,6 +22,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLogin, onSwitchToSignUp 
     try {
       // 1. เรียก API Login ของจริง
       const response = await login({ email, password });
+      console.log("Login Response Debug:", response);
 
       if (response.success && response.data?.access_token) {
         localStorage.setItem('token', response.data.access_token);

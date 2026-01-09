@@ -1,11 +1,10 @@
 import axios from 'axios';
 import { Category, CasePayload, CaseResponse, User, BankAccount } from '../../types';
-
+const BASE_URL = import.meta.env.VITE_API_URL || '';
+const API_BASE_URL = `${BASE_URL}/api/v1`;
 // --- CONFIGURATION ---
-const API_BASE_URL = '/api/v1';
-
 export const api = axios.create({
-  baseURL: API_BASE_URL,
+  baseURL: `${BASE_URL}/api/v1`, // ต่อท้ายด้วย /api/v1 เสมอ
   headers: {
     'Content-Type': 'application/json',
   },
@@ -67,7 +66,7 @@ export interface SignupPayload {
   email: string;
   password: string;
   name: string;
-  position: string;
+  position?: string;
 }
 
 export interface AuthResponse {
@@ -104,6 +103,24 @@ api.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+export interface ChatResponse {
+  reply: string;
+}
+
+// [NEW] ฟังก์ชันสำหรับคุยกับ AI ผ่าน Backend
+export const chatWithAI = async (message: string): Promise<string> => {
+  try {
+    // ยิง POST ไปที่ /api/v1/chat
+    // สังเกตว่าเราส่งไปแค่ { message: "ข้อความ" }
+    const response = await api.post('/chat', { message }); 
+    
+    // Backend จะส่งกลับมาเป็น { "reply": "คำตอบจาก AI..." }
+    return response.data.reply;
+  } catch (error) {
+    console.error("Chat API Error:", error);
+    return "ขออภัยครับ ไม่สามารถติดต่อเซิร์ฟเวอร์ได้ในขณะนี้ (Backend Error)";
+  }
+};
 
 // API Calls
 export const login = async (payload: LoginPayload): Promise<AuthResponse> => {
@@ -123,7 +140,7 @@ export const getDashboardData = async (year: number): Promise<DashboardData> => 
 };
 
 // --- แก้ไขตรงนี้ ---
-export const getCategories = async (type?: 'EXPENSE' | 'INCOME' | 'ASSET'): Promise<Category[]> => {
+export const getCategories = async (type?: 'EXPENSE' | 'REVENUE' | 'ASSET'): Promise<Category[]> => {
   const query = type ? `?type=${type}` : '';
   
   // 1. เพิ่ม / ปิดท้าย เพื่อแก้ 307
@@ -147,6 +164,23 @@ export const createCase = async (payload: CasePayload): Promise<CaseResponse> =>
 // Submit Case
 export const submitCase = async (caseId: string): Promise<WorkflowResponse> => {
   const response = await api.post(`/cases/${caseId}/submit`);
+  return response.data;
+};
+// [NEW] ดึงรายการ Case (รองรับการกรองสถานะ)
+export const getCases = async (status?: string): Promise<CaseResponse[]> => {
+  const query = status ? `?status=${status}` : '';
+  const response = await api.get(`/cases/${query}`);
+  // Backend อาจจะส่งเป็น Array ตรงๆ หรือห่อด้วย data envelope ให้เช็คดู (ตามโค้ด Backend ล่าสุดน่าจะส่ง Array ตรงๆ)
+  return Array.isArray(response.data) ? response.data : (response.data.data || []);
+};
+// สั่งอนุมัติ Case
+export const approveCase = async (caseId: string): Promise<WorkflowResponse> => {
+  const response = await api.post(`/cases/${caseId}/approve`);
+  return response.data;
+};
+// [NEW] เพิ่มฟังก์ชันสำหรับ Reject/Cancel
+export const rejectCase = async (caseId: string, reason: string = ""): Promise<WorkflowResponse> => {
+  const response = await api.post(`/cases/${caseId}/reject`, { note: reason });
   return response.data;
 };
 
@@ -176,4 +210,17 @@ export const getInsights = async (userId?: string, month?: string): Promise<Insi
 export const searchDocumentsByNo = async (docNo: string): Promise<any[]> => {
   const response = await api.get(`/cases/search?doc_no=${encodeURIComponent(docNo)}`);
   return Array.isArray(response.data) ? response.data : (response.data.data || []);
+  try {
+    //เรียก ร่างจาก category backend > bankAccounts Frontend
+    const categories = await getCategories('ASSET');
+    return categories.map(cat => ({
+      id: cat.id,
+      account_number: cat.account_code || '-', // สมมติว่าเก็บเลขบัญชีใน account_code
+      account_name: cat.name_th,
+      bank_name: cat.name_th
+    }));
+  } catch (error) {
+    console.error("Error fetching bank accounts from categories:", error);
+    return [];
+  }
 };

@@ -6,6 +6,10 @@ import {
   Lightbulb, 
   TrendingUp, 
   MessageSquare
+  MessageSquare,
+  Search,
+  MoreHorizontal,
+  CheckCircle
 } from 'lucide-react';
 import { ViewType } from '../../types';
 
@@ -22,6 +26,7 @@ const MENU_ITEMS = [
   { id: ViewType.INSIGHTS, label: 'Insights', icon: Lightbulb },
   { id: ViewType.PROFIT_LOSS, label: 'Profit and loss', icon: TrendingUp },
   { id: ViewType.CHAT_VIEW, label: 'Chat View', icon: MessageSquare },
+  { id: ViewType.ADMIN_APPROVAL, label: 'Approvals (Admin)', icon: CheckCircle },
 ];
 
 interface NavButtonProps {
