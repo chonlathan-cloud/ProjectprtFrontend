@@ -5,7 +5,6 @@ import {
   FileText, 
   Lightbulb, 
   TrendingUp, 
-  MessageSquare
   MessageSquare,
   Search,
   MoreHorizontal,
