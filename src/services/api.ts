@@ -134,7 +134,7 @@ export const signup = async (payload: SignupPayload): Promise<AuthResponse> => {
 }
 
 export const getDashboardData = async (year: number): Promise<DashboardData> => {
-  const response = await api.get(`/dashboard?year=${year}`);
+  const response = await api.get(`/documents?year=${year}`);
   // Dashboard API ห่อด้วย data envelope
   return response.data.data;
 };
@@ -222,6 +222,12 @@ export const getInsights = async (username?: string, month?: number, year?: numb
 
 // Search Documents by Doc No (for JV Consolidation)
 export const searchDocumentsByNo = async (docNo: string): Promise<any[]> => {
-  const response = await api.get(`/cases/search?doc_no=${encodeURIComponent(docNo)}`);
+  const response = await api.get(`/cases/search-by-doc?doc_no=${encodeURIComponent(docNo)}`);
   return Array.isArray(response.data) ? response.data : (response.data.data || []);
+};
+
+// API สำหรับสร้าง JV
+export const createJV = async (payload: { main_case_id: string, linked_case_ids: string[], description: string }) => {
+  const response = await api.post('/documents/jv', payload);
+  return response.data;
 };

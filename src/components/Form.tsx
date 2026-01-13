@@ -7,7 +7,7 @@ import {
 import { PaymentVoucherTemplate, ReceiveVoucherTemplate, JournalVoucherTemplate, DocumentData } from './DocumentTemplates';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
-import { createCase, submitCase, getCategories, getUsers, getBankAccounts, searchDocumentsByNo } from '../services/api'; // Import API
+import { createCase, submitCase, getCategories, getUsers, getBankAccounts, searchDocumentsByNo, createJV } from '../services/api'; // Import API
 import { Category, User, BankAccount } from '../../types'; // Import Types
 
 const INITIAL_DATA: DocumentData = {
@@ -40,6 +40,7 @@ export const Form: React.FC = () => {
   
   // JV Consolidation States
   const [searchQuery, setSearchQuery] = useState('');
+  const [linkedCaseIds, setLinkedCaseIds] = useState<string[]>([]);
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearchingDocs, setIsSearchingDocs] = useState(false);
   const printRef = useRef<HTMLDivElement>(null);
@@ -102,20 +103,26 @@ export const Form: React.FC = () => {
 
   const handleInputChange = (field: keyof DocumentData, value: string) => {
     setData(prev => ({ ...prev, [field]: value }));
-  };
-
-  const handleItemChange = (id: string, field: string, value: string | number) => {
-    setData(prev => ({...prev,[field]: value}));
-
+    // ย้าย Logic เช็ค type มาไว้ตรงนี้ เพราะ type อยู่ระดับ DocumentData ไม่ใช่ Item
     if (field === 'type') {
       if (value === 'rv'){
-        setTransactionType('INCOME'); //income
+        setTransactionType('INCOME'); // income
       } else {
         setTransactionType('EXPENSE'); // Expense
       }
       setSelectedCategoryId('');
       setSelectedBankAccountId('');
     }
+  };
+
+  const handleItemChange = (id: string, field: string, value: string | number) => {
+    setData(prev => ({
+      ...prev,
+      items: prev.items.map(item => 
+        // เช็คว่า ID ตรงกันไหม ถ้าตรงให้สร้าง object ใหม่ที่อัปเดตค่า field นั้น
+        item.id === id ? { ...item, [field]: value } : item
+      )
+    }));
   };
 
   const addItem = () => {
@@ -140,28 +147,71 @@ export const Form: React.FC = () => {
     }));
   };
 
-  // 2. Logic การ Save ไป Backend
   const handleSaveToBackend = async () => {
-    if (data.type !== 're' && !selectedCategoryId) {
-      alert("กรุณาเลือกหมวดหมู่บัญชี (Category) ก่อนบันทึก");
-      return;
+    // ---------------------------------------------------------
+    // 1. ตรวจสอบและจัดการ JV (Journal Voucher) เป็นอันดับแรก
+    // ---------------------------------------------------------
+    if (data.type === 'jv') {
+        if (linkedCaseIds.length === 0) {
+            alert("กรุณาดึงข้อมูลเอกสาร (Pull) อย่างน้อย 1 รายการเพื่อทำ JV");
+            return false;
+        }
+
+        setIsSaving(true);
+        try {
+            // ใช้ Case แรกเป็น Main Case, ที่เหลือเป็น Linked
+            const [mainId, ...others] = linkedCaseIds;
+            
+            const jvPayload = {
+                main_case_id: mainId,
+                linked_case_ids: others,
+                description: data.purpose || "Consolidated JV"
+            };
+
+            console.log("Creating JV with:", jvPayload);
+            const res = await createJV(jvPayload); 
+            
+            setData(prev => ({ ...prev, docNo: res.doc_no }));
+            alert(`สร้าง JV สำเร็จ! เลขที่: ${res.doc_no}`);
+            return true;
+
+        } catch (error: any) {
+            console.error('JV Save failed:', error);
+            alert(`สร้าง JV ไม่สำเร็จ: ${error.message}`);
+            return false;
+        } finally {
+            setIsSaving(false);
+        }
     }
-    // validation สำหรับ RV (ต้องเลือกบัญชีธนาคาร)
+
+    // ---------------------------------------------------------
+    // 2. Validation สำหรับ PV และ RV
+    // ---------------------------------------------------------
+    
+    // ✅ จุดที่แก้ไข: เปลี่ยน 're' เป็น 'rv'
+    // ความหมาย: ถ้า "ไม่ใช่ RV" (เช่นเป็น PV) และ "ไม่ได้เลือกหมวด" -> ให้แจ้งเตือน
+    if (data.type !== 'rv' && !selectedCategoryId) {
+      alert("กรุณาเลือกหมวดหมู่บัญชี (Category) ก่อนบันทึก");
+      return false;
+    }
+
+    // เช็คบัญชีธนาคารสำหรับ RV (Income)
     if (transactionType === 'INCOME' && !selectedBankAccountId) {
         alert("กรุณาเลือกบัญชีธนาคาร/เงินสด ที่รับเงินเข้า")
         return false;
     }
+
     setIsSaving(true);
     try {
-      // 2.1 คำนวณยอดรวม (Items vs Amount)
+      // ---------------------------------------------------------
+      // 3. Logic สร้าง PV/RV (Standard Flow)
+      // ---------------------------------------------------------
       const totalAmount = data.items.reduce((sum, item) => {
         const q = Number(item.quantity) || 0;
         const p = Number(item.price) || 0;
         return sum + (q * p);
       }, 0);
 
-      // 2.2 รวมชื่อรายการสินค้าใส่ Purpose (เพื่อให้ Search เจอในอนาคต)
-      // เอา Purpose ที่ user กรอก + รายการสินค้า
       const itemsDescription = data.items
         .map(i => i.description)
         .filter(d => d.trim() !== '')
@@ -172,10 +222,8 @@ export const Form: React.FC = () => {
         finalPurpose = `${finalPurpose ? finalPurpose + ' : ' : ''}${itemsDescription}`;
       }
       
-      // ถ้า finalPurpose ว่างจริงๆ ให้ใส่ default
       if (!finalPurpose.trim()) finalPurpose = "ค่าใช้จ่ายทั่วไป";
 
-      // [CORE CHANGE] สร้าง Payload ส่ง Backend
       const casePayload: any = {
         category_id: selectedCategoryId,
         requested_amount: totalAmount,
@@ -184,24 +232,17 @@ export const Form: React.FC = () => {
         cost_center_id: null,
         funding_type: 'OPERATING',
       };
-      // ถ้าเป็นรายร้บ (income/RV) ต้องส่งไปที่  deposit_account_id ด้วย
+
       if (transactionType === 'INCOME') {
         casePayload.deposit_account_id = selectedBankAccountId;
       }
 
       console.log("Creating Case with:", casePayload);
 
-      // 2.4 Call API Create Case
       const newCase = await createCase(casePayload);
-      
-      // 2.5 Call API Submit Case (ถ้าต้องการ Submit เลย)
       const submitResult = await submitCase(newCase.id);
 
-      // 3. Update Doc No
-      // หมายเหตุ: Backend ปัจจุบันจะให้เลข PV/RV ตอน 'Approve' เท่านั้น
-      // ดังนั้นตอนนี้เราจะโชว์ 'Case No' ไปก่อน หรือรอหน้า Finance Approve
       const displayDocNo = submitResult.doc_no || newCase.case_no;
-
       setData(prev => ({ ...prev, docNo: displayDocNo }));
       
       alert(`บันทึกสำเร็จ! \nเลขที่อ้างอิง: ${displayDocNo} \n(สถานะ: รออนุมัติ/Submitted)`);
@@ -215,7 +256,8 @@ export const Form: React.FC = () => {
     } finally {
       setIsSaving(false);
     }
-  };
+  };  
+
 
   // 3. Logic การค้นหาและดึงข้อมูลเอกสาร (Consolidation)
   const handleSearchDocs = async () => {
@@ -236,24 +278,32 @@ export const Form: React.FC = () => {
   };
 
   const pullDocumentData = (doc: any) => {
-    // ดึงค่ารายการสินค้า (Items)
-    // หมายเหตุ: mapping field ตามโครงสร้าง data จาก backend
-    const pulledItems = (doc.items || []).map((item: any) => ({
-      id: Date.now().toString() + Math.random().toString(36).substring(2, 11),
-      description: item.description || item.purpose || '',
-      quantity: item.quantity || '1',
-      unit: item.unit || 'รายการ',
-      price: item.price || item.amount || '0',
-      refNo: doc.doc_no || doc.case_no || ''
-    }));
+    // doc คือ object ที่ได้จาก API search_cases (มี id, case_no, doc_no, etc.)
+    
+    // เก็บ ID เข้า state
+    setLinkedCaseIds(prev => {
+        // ป้องกัน ID ซ้ำ
+        if (prev.includes(doc.id)) return prev;
+        return [...prev, doc.id];
+    });
+
+    // ส่วนแสดงผล (เหมือนเดิม)
+    const pulledItem = {
+      id: Date.now().toString(),
+      description: doc.description || doc.purpose || '', // ใช้ description จาก API
+      quantity: '1',
+      unit: 'รายการ',
+      price: doc.requested_amount || '0',
+      refNo: doc.doc_no || doc.case_no // โชว์เลขที่เอกสารอ้างอิง
+    };
 
     setData(prev => ({
       ...prev,
-      items: [...prev.items.filter(i => i.description !== ''), ...pulledItems]
+      // ลบแถวว่างทิ้งแล้วเติมของใหม่
+      items: [...prev.items.filter(i => i.description !== ''), pulledItem]
     }));
     
-    // แจ้งเตือนเล็กน้อย
-    alert(`ดึงข้อมูลจาก ${doc.doc_no || doc.case_no} เรียบร้อยแล้ว`);
+    alert(`ดึงข้อมูลจาก ${doc.doc_no} เรียบร้อย (Case ID: ${doc.id})`);
   };
 
   const generatePDF = async (action: 'submit' | 'download') => {
