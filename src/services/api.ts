@@ -267,3 +267,4 @@ export const getProfitLossData = async (year: number): Promise<ProfitLossBackend
     console.error("Failed to fetch P&L data, using fallback structure", error);
     throw error;
   }
+};
