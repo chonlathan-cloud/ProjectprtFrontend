@@ -36,7 +36,7 @@ export const Form: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
-  const [transactionType, setTransactionType] = useState<'EXPENSE' | 'INCOME'>('EXPENSE');
+  const [transactionType, setTransactionType] = useState<'EXPENSE' | 'REVENUE'>('EXPENSE');
   
   // JV Consolidation States
   const [searchQuery, setSearchQuery] = useState('');
@@ -95,7 +95,7 @@ export const Form: React.FC = () => {
   }, [transactionType]);
 
   useEffect(() => {
-    if (transactionType === 'INCOME' && categories.length > 0) {
+    if (transactionType === 'REVENUE' && categories.length > 0) {
       // เลือกตัวแรกใน List ให้เลยอัตโนมัติ
       setSelectedCategoryId(categories[0].id);
     }
@@ -106,7 +106,7 @@ export const Form: React.FC = () => {
     // ย้าย Logic เช็ค type มาไว้ตรงนี้ เพราะ type อยู่ระดับ DocumentData ไม่ใช่ Item
     if (field === 'type') {
       if (value === 'rv'){
-        setTransactionType('INCOME'); // income
+        setTransactionType('REVENUE'); // revenue
       } else {
         setTransactionType('EXPENSE'); // Expense
       }
@@ -196,7 +196,7 @@ export const Form: React.FC = () => {
     }
 
     // เช็คบัญชีธนาคารสำหรับ RV (Income)
-    if (transactionType === 'INCOME' && !selectedBankAccountId) {
+    if (transactionType === 'REVENUE' && !selectedBankAccountId) {
         alert("กรุณาเลือกบัญชีธนาคาร/เงินสด ที่รับเงินเข้า")
         return false;
     }
@@ -207,10 +207,18 @@ export const Form: React.FC = () => {
       // 3. Logic สร้าง PV/RV (Standard Flow)
       // ---------------------------------------------------------
       const totalAmount = data.items.reduce((sum, item) => {
-        const q = Number(item.quantity) || 0;
         const p = Number(item.price) || 0;
+        if (data.type === 'rv') {
+          return sum + p;
+        }
+        const q = Number(item.quantity) || 0;
         return sum + (q * p);
       }, 0);
+
+      if (totalAmount <= 0) {
+        alert("กรุณากรอกราคา/จำนวนให้มากกว่า 0");
+        return false;
+      }
 
       const itemsDescription = data.items
         .map(i => i.description)
@@ -233,7 +241,7 @@ export const Form: React.FC = () => {
         funding_type: 'OPERATING',
       };
 
-      if (transactionType === 'INCOME') {
+      if (transactionType === 'REVENUE') {
         casePayload.deposit_account_id = selectedBankAccountId;
       }
 
