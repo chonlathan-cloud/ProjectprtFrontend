@@ -199,8 +199,14 @@ export const rejectCase = async (caseId: string, reason: string = ""): Promise<W
 
 // Fetch Users
 export const getUsers = async (): Promise<User[]> => {
-  const response = await api.get('/auth/users/'); // Assuming this endpoint based on auth context
-  return Array.isArray(response.data) ? response.data : (response.data.data || []);
+  const response = await api.get('/admin/users'); // Assuming this endpoint based on auth context
+  const data = Array.isArray(response.data) ? response.data : (response.data.data || []);
+  return data.map((u: any) => ({
+    requester_id: u.google_sub ?? u.email ?? u.user_id,
+    name: u.name,
+    email: u.email,
+    position: u.position
+  }));
 };
 
 // Fetch Bank Accounts
@@ -221,19 +227,16 @@ export const getBankAccounts = async (): Promise<BankAccount[]> => {
 };
 
 // Fetch Insights Data
-export const getInsights = async (username?: string, month?: number, year?: number, categoryId?: string): Promise<InsightsData> => {
+export const getInsights = async (requesterId?: string, month?: number, year?: number, categoryId?: string): Promise<InsightsData> => {
   const params = new URLSearchParams();
-  
-  // ส่ง query param: user_id (แต่ค่าคือ username ตามที่คุณขอ), month, year, category_id
-  if (username) params.append('user_id', username);
+  if (requesterId) params.append('user_id', requesterId);
   if (month) params.append('month', month.toString());
   if (year) params.append('year', year.toString());
   if (categoryId) params.append('category_id', categoryId);
-  
+
   const response = await api.get(`/insights/?${params.toString()}`);
   return response.data.data;
 };
-
 // Search Documents by Doc No (for JV Consolidation)
 export const searchDocumentsByNo = async (docNo: string): Promise<any[]> => {
   const response = await api.get(`/cases/search-by-doc?doc_no=${encodeURIComponent(docNo)}`);

@@ -29,7 +29,6 @@ export const Insights: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [dataLoading, setDataLoading] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState<string>('');
-  const [selectedUsername, setSelectedUsername] = useState<string>(''); 
   const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth() + 1); // 1-12
   const [selectedYear, setSelectedYear] = useState<number>(CURRENT_YEAR);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -38,12 +37,12 @@ export const Insights: React.FC = () => {
   useEffect(() => {
     const fetchOtherData = async () => {
       try {
-        const [userData, catData] = await Promise.all([
+        const [userRes, catRes] = await Promise.allSettled([
           getUsers(),
-          getCategories() // Fetch all categories for filter
+          getCategories()
         ]);
-        setUsers(userData);
-        setCategories(catData);
+        if (userRes.status === 'fulfilled') setUsers(userRes.value);
+        if (catRes.status === 'fulfilled') setCategories(catRes.value);
       } catch (error) {
         console.error("Failed to fetch initial data:", error);
       } finally {
@@ -58,7 +57,7 @@ export const Insights: React.FC = () => {
       setDataLoading(true);
       try {
         // ส่งเป็น year, month (number), username, categoryId
-        const result = await getInsights(selectedUsername, selectedMonth, selectedYear, selectedCategoryId);
+        const result = await getInsights(selectedUserId, selectedMonth, selectedYear, selectedCategoryId);
         if (result) {
           setInsights(result);
         }
@@ -69,10 +68,10 @@ export const Insights: React.FC = () => {
       }
     };
     fetchInsightsData();
-  }, [selectedUsername, selectedMonth, selectedYear, selectedCategoryId]); // Dependency เปลี่ยน
+  }, [selectedUserId, selectedMonth, selectedYear, selectedCategoryId]); // Dependency เปลี่ยน
 
-  const getCreatorName = (userId: string) => {
-    const user = users.find(u => u.user_id === userId);
+  const getCreatorName = (requesterId: string) => {
+    const user = users.find(u => u.requester_id === requesterId);
     return user ? user.name : 'Unknown User';
   };
 
@@ -95,13 +94,13 @@ export const Insights: React.FC = () => {
         <div className="flex flex-wrap gap-3">
           <div className="relative">
             <select 
-              value={selectedUsername}
-              onChange={(e) => setSelectedUsername(e.target.value)}
+              value={selectedUserId}
+              onChange={(e) => setSelectedUserId(e.target.value)}
               className="pl-4 pr-10 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-100 bg-white text-sm font-medium text-slate-700 appearance-none cursor-pointer"
             >
               <option value="">ผู้ทำรายการทั้งหมด</option>
               {users.map(u => (
-                <option key={u.user_id} value={u.name}>{u.name}</option>
+                <option key={u.requester_id} value={u.requester_id}>{u.name}</option>
               ))}
             </select>
             <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
@@ -135,8 +134,8 @@ export const Insights: React.FC = () => {
               onChange={(e) => setSelectedMonth(Number(e.target.value))}
               className="pl-4 pr-10 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-100 bg-white text-sm font-medium text-slate-700 appearance-none cursor-pointer"
             >
-              {MONTHS.map(m => (
-                <option key={m} value={m}>{m}</option>
+              {MONTHS.map((m, idx) => (
+                <option key={m} value={idx + 1}>{m}</option>
               ))}
             </select>
             <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
