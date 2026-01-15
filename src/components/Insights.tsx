@@ -245,7 +245,7 @@ export const Insights: React.FC = () => {
                 <th className="px-6 py-4 text-xs font-black text-slate-500 uppercase tracking-widest border-b border-slate-100">เลขที่ใบ ปส</th>
                 <th className="px-6 py-4 text-xs font-black text-slate-500 uppercase tracking-widest border-b border-slate-100">วันเดือนปี</th>
                 <th className="px-6 py-4 text-xs font-black text-slate-500 uppercase tracking-widest border-b border-slate-100">ชื่อผู้ทำรายการ</th>
-                <th className="px-6 py-4 text-xs font-black text-slate-500 uppercase tracking-widest border-b border-slate-100">User_code</th>
+                <th className="px-6 py-4 text-xs font-black text-slate-500 uppercase tracking-widest border-b border-slate-100">จำนวนเงิน</th>
                 <th className="px-6 py-4 text-xs font-black text-slate-500 uppercase tracking-widest border-b border-slate-100">วัตถุประสงค์</th>
               </tr>
             </thead>
@@ -261,8 +261,8 @@ export const Insights: React.FC = () => {
                       <span className="text-sm font-bold text-slate-700">{getCreatorName(item.creator_id)}</span>
                     </td>
                     <td className="px-6 py-4">
-                      <span className="inline-flex items-center px-2.5 py-1 bg-slate-100 text-slate-600 rounded-lg text-[10px] font-black tracking-tighter">
-                        {item.user_code}
+                      <span className="text-sm font-bold text-slate-700">
+                        {item.amount?.toLocaleString() || '0'}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-sm text-slate-600 max-w-sm font-medium">

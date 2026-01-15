@@ -52,6 +52,7 @@ export interface InsightsData {
     date: string;
     creator_id: string;
     user_code: string;
+    amount: number;
     purpose: string;
   }>;
 }
