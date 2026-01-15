@@ -1,0 +1,733 @@
+// src/components/Form.tsx
+import React, { useState, useRef, useEffect } from 'react';
+import { 
+  Search, MoreHorizontal, Plus, Trash2, Download, Save, 
+  Loader2 
+} from 'lucide-react';
+import { PaymentVoucherTemplate, ReceiveVoucherTemplate, JournalVoucherTemplate, DocumentData } from './DocumentTemplates';
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
+import { createCase, submitCase, getCategories, getUsers, getBankAccounts, searchDocumentsByNo, createJV } from '../services/api'; // Import API
+import { Category, User, BankAccount } from '../../types'; // Import Types
+
+const INITIAL_DATA: DocumentData = {
+  type: 'pv', 
+  docNo: '',
+  date: new Date().getDate().toString().padStart(2, '0'),
+  month: new Date().toLocaleString('th-TH', { month: 'long' }),
+  year: (new Date().getFullYear() + 543).toString(),
+  name: '',
+  position: '',
+  bankAccount: '',
+  makerName: '',
+  department: '',
+  subject: '',
+  purpose: '',
+  psNo: '',
+  items: [
+    { id: '1', description: '', quantity: '', unit: '', price: '', refNo: '' }
+  ]
+};
+
+export const Form: React.FC = () => {
+  const [data, setData] = useState<DocumentData>(INITIAL_DATA);
+  const [isSaving, setIsSaving] = useState(false);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
+  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
+  const [transactionType, setTransactionType] = useState<'EXPENSE' | 'REVENUE'>('EXPENSE');
+  
+  // JV Consolidation States
+  const [searchQuery, setSearchQuery] = useState('');
+  const [linkedCaseIds, setLinkedCaseIds] = useState<string[]>([]);
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [isSearchingDocs, setIsSearchingDocs] = useState(false);
+  const printRef = useRef<HTMLDivElement>(null);
+  const [selectedBankAccountId, setSelectedBankAccountId] = useState<string>('');
+
+  // 1. โหลดข้อมูลเมื่อเข้าหน้า Form
+  useEffect(() => {
+    // A. ดึง User จาก LocalStorage มาเป็น Default
+    const storedUser = localStorage.getItem('user');
+    if (storedUser) {
+      try {
+        const userObj = JSON.parse(storedUser);
+        if (userObj.name) {
+          setData(prev => ({ ...prev, name: userObj.name }));
+        }
+      } catch (e) {
+        console.error("Failed to parse user data", e);
+      }
+    }
+
+    // B. ดึง Categories ตาม transactionType
+    const fetchCats = async () => {
+      try {
+        const cats = await getCategories(transactionType);
+        setCategories(cats);
+      } catch (error) {
+        console.error("Error fetching categories:", error);
+      }
+    };
+    fetchCats();
+
+    // C. ดึง Users และ Bank Accounts
+    const fetchOtherData = async () => {
+      try {
+        const u = await getUsers();
+        setUsers(u);
+      } catch (error) {
+        console.warn("⚠️ Warning: Could not fetch users (API not found or error)", error);
+        // ไม่ต้อง throw error ปล่อยให้ทำงานต่อ
+      }
+
+      // 2. ดึง Bank Accounts (หัวใจสำคัญของ RV)
+      try {
+        const b = await getBankAccounts();
+        console.log("✅ Bank Accounts fetched:", b); // เช็คใน Console ว่าข้อมูลมาไหม
+        setBankAccounts(b);
+      } catch (error) {
+        console.error("❌ Error fetching bank accounts:", error);
+      }
+    };
+    fetchOtherData();
+  }, [transactionType]);
+
+  useEffect(() => {
+    if (transactionType === 'REVENUE' && categories.length > 0) {
+      // เลือกตัวแรกใน List ให้เลยอัตโนมัติ
+      setSelectedCategoryId(categories[0].id);
+    }
+  }, [categories, transactionType]);
+
+  const handleInputChange = (field: keyof DocumentData, value: string) => {
+    setData(prev => ({ ...prev, [field]: value }));
+    // ย้าย Logic เช็ค type มาไว้ตรงนี้ เพราะ type อยู่ระดับ DocumentData ไม่ใช่ Item
+    if (field === 'type') {
+      if (value === 'rv'){
+        setTransactionType('REVENUE'); // revenue
+      } else {
+        setTransactionType('EXPENSE'); // Expense
+      }
+      setSelectedCategoryId('');
+      setSelectedBankAccountId('');
+    }
+  };
+
+  const handleItemChange = (id: string, field: string, value: string | number) => {
+    setData(prev => ({
+      ...prev,
+      items: prev.items.map(item => 
+        // เช็คว่า ID ตรงกันไหม ถ้าตรงให้สร้าง object ใหม่ที่อัปเดตค่า field นั้น
+        item.id === id ? { ...item, [field]: value } : item
+      )
+    }));
+  };
+
+  const addItem = () => {
+    setData(prev => ({
+      ...prev,
+      items: [...prev.items, { 
+        id: Date.now().toString(), 
+        description: '', 
+        quantity: '', 
+        unit: '', 
+        price: '',
+        refNo: ''
+      }]
+    }));
+  };
+
+  const removeItem = (id: string) => {
+    if (data.items.length === 1) return;
+    setData(prev => ({
+      ...prev,
+      items: prev.items.filter(item => item.id !== id)
+    }));
+  };
+
+  const handleSaveToBackend = async () => {
+    // ---------------------------------------------------------
+    // 1. ตรวจสอบและจัดการ JV (Journal Voucher) เป็นอันดับแรก
+    // ---------------------------------------------------------
+    if (data.type === 'jv') {
+        if (linkedCaseIds.length === 0) {
+            alert("กรุณาดึงข้อมูลเอกสาร (Pull) อย่างน้อย 1 รายการเพื่อทำ JV");
+            return false;
+        }
+
+        setIsSaving(true);
+        try {
+            // ใช้ Case แรกเป็น Main Case, ที่เหลือเป็น Linked
+            const [mainId, ...others] = linkedCaseIds;
+            
+            const jvPayload = {
+                main_case_id: mainId,
+                linked_case_ids: others,
+                description: data.purpose || "Consolidated JV"
+            };
+
+            console.log("Creating JV with:", jvPayload);
+            const res = await createJV(jvPayload); 
+            
+            setData(prev => ({ ...prev, docNo: res.doc_no }));
+            alert(`สร้าง JV สำเร็จ! เลขที่: ${res.doc_no}`);
+            return true;
+
+        } catch (error: any) {
+            console.error('JV Save failed:', error);
+            alert(`สร้าง JV ไม่สำเร็จ: ${error.message}`);
+            return false;
+        } finally {
+            setIsSaving(false);
+        }
+    }
+
+    // ---------------------------------------------------------
+    // 2. Validation สำหรับ PV และ RV
+    // ---------------------------------------------------------
+    
+    // ✅ จุดที่แก้ไข: เปลี่ยน 're' เป็น 'rv'
+    // ความหมาย: ถ้า "ไม่ใช่ RV" (เช่นเป็น PV) และ "ไม่ได้เลือกหมวด" -> ให้แจ้งเตือน
+    if (data.type !== 'rv' && !selectedCategoryId) {
+      alert("กรุณาเลือกหมวดหมู่บัญชี (Category) ก่อนบันทึก");
+      return false;
+    }
+
+    // เช็คบัญชีธนาคารสำหรับ RV (Income)
+    if (transactionType === 'REVENUE' && !selectedBankAccountId) {
+        alert("กรุณาเลือกบัญชีธนาคาร/เงินสด ที่รับเงินเข้า")
+        return false;
+    }
+
+    setIsSaving(true);
+    try {
+      // ---------------------------------------------------------
+      // 3. Logic สร้าง PV/RV (Standard Flow)
+      // ---------------------------------------------------------
+      const totalAmount = data.items.reduce((sum, item) => {
+        const p = Number(item.price) || 0;
+        if (data.type === 'rv') {
+          return sum + p;
+        }
+        const q = Number(item.quantity) || 0;
+        return sum + (q * p);
+      }, 0);
+
+      if (totalAmount <= 0) {
+        alert("กรุณากรอกราคา/จำนวนให้มากกว่า 0");
+        return false;
+      }
+
+      const itemsDescription = data.items
+        .map(i => i.description)
+        .filter(d => d.trim() !== '')
+        .join(', ');
+      
+      let finalPurpose = data.purpose;
+      if (itemsDescription) {
+        finalPurpose = `${finalPurpose ? finalPurpose + ' : ' : ''}${itemsDescription}`;
+      }
+      
+      if (!finalPurpose.trim()) finalPurpose = "ค่าใช้จ่ายทั่วไป";
+
+      const casePayload: any = {
+        category_id: selectedCategoryId,
+        requested_amount: totalAmount,
+        purpose: finalPurpose,
+        department_id: data.department || null,
+        cost_center_id: null,
+        funding_type: 'OPERATING',
+      };
+
+      if (transactionType === 'REVENUE') {
+        casePayload.deposit_account_id = selectedBankAccountId;
+      }
+
+      console.log("Creating Case with:", casePayload);
+
+      const newCase = await createCase(casePayload);
+      const submitResult = await submitCase(newCase.id);
+
+      const displayDocNo = submitResult.doc_no || newCase.case_no;
+      setData(prev => ({ ...prev, docNo: displayDocNo }));
+      
+      alert(`บันทึกสำเร็จ! \nเลขที่อ้างอิง: ${displayDocNo} \n(สถานะ: รออนุมัติ/Submitted)`);
+      return true;
+
+    } catch (error: any) {
+      console.error('Save failed:', error);
+      const msg = error.response?.data?.error?.message || error.message;
+      alert(`บันทึกไม่สำเร็จ: ${msg}`);
+      return false;
+    } finally {
+      setIsSaving(false);
+    }
+  };  
+
+
+  // 3. Logic การค้นหาและดึงข้อมูลเอกสาร (Consolidation)
+  const handleSearchDocs = async () => {
+    if (!searchQuery.trim()) return;
+    setIsSearchingDocs(true);
+    try {
+      const results = await searchDocumentsByNo(searchQuery);
+      setSearchResults(results);
+      if (results.length === 0) {
+        alert("ไม่พบเอกสารที่ระบุ");
+      }
+    } catch (error) {
+      console.error("Search failed:", error);
+      alert("เกิดข้อผิดพลาดในการค้นหา");
+    } finally {
+      setIsSearchingDocs(false);
+    }
+  };
+
+  const pullDocumentData = (doc: any) => {
+    // doc คือ object ที่ได้จาก API search_cases (มี id, case_no, doc_no, etc.)
+    
+    // เก็บ ID เข้า state
+    setLinkedCaseIds(prev => {
+        // ป้องกัน ID ซ้ำ
+        if (prev.includes(doc.id)) return prev;
+        return [...prev, doc.id];
+    });
+
+    // ส่วนแสดงผล (เหมือนเดิม)
+    const pulledItem = {
+      id: Date.now().toString(),
+      description: doc.description || doc.purpose || '', // ใช้ description จาก API
+      quantity: '1',
+      unit: 'รายการ',
+      price: doc.requested_amount || '0',
+      refNo: doc.doc_no || doc.case_no // โชว์เลขที่เอกสารอ้างอิง
+    };
+
+    setData(prev => ({
+      ...prev,
+      // ลบแถวว่างทิ้งแล้วเติมของใหม่
+      items: [...prev.items.filter(i => i.description !== ''), pulledItem]
+    }));
+    
+    alert(`ดึงข้อมูลจาก ${doc.doc_no} เรียบร้อย (Case ID: ${doc.id})`);
+  };
+
+  const generatePDF = async (action: 'submit' | 'download') => {
+    // ถ้ากด Submit ให้ Save ลง Backend ก่อน
+    if (action === 'submit') {
+        const success = await handleSaveToBackend();
+        if (!success) return; // ถ้า Save ไม่ผ่าน ไม่ต้อง Generate PDF ต่อ
+        
+        // รอแป๊บนึงให้ State docNo อัปเดตก่อน generate PDF
+        await new Promise(resolve => setTimeout(resolve, 500));
+    }
+
+    if (!printRef.current) return;
+
+    try {
+      // Ensure fonts are loaded before capturing
+      await document.fonts.ready;
+      
+      const canvas = await html2canvas(printRef.current, {
+        scale: 3, // 3 is usually enough and more stable than 4
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff',
+        windowWidth: 1200, // Wider window for better layout stability during capture
+        onclone: (clonedDoc) => {
+          const element = clonedDoc.querySelector('.transform.scale-90');
+          if (element instanceof HTMLElement) {
+            element.style.transform = 'none';
+            element.style.fontFamily = "'Sarabun', sans-serif";
+          }
+        }
+      } as any);
+
+      const imgData = canvas.toDataURL('image/jpeg', 1.0);
+      const pdf = new jsPDF({
+        orientation: 'p',
+        unit: 'px',
+        format: 'a4'
+      });
+
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+      
+      pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight, undefined, 'FAST');
+
+      const fileName = `${data.type}_${data.docNo || 'draft'}.pdf`;
+
+      if (action === 'download') {
+        pdf.save(fileName);
+      } else {
+        // กรณี Submit บันทึก PDF ลงเครื่องด้วย (หรือจะอัปโหลดกลับไป Backend ก็ได้ในอนาคต)
+        pdf.save(fileName);
+      }
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      alert('เกิดข้อผิดพลาดในการสร้าง PDF');
+    }
+  };
+
+  const inputStyle = "w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-100 transition-all text-sm";
+  const labelStyle = "block text-sm font-semibold text-gray-600 mb-2";
+
+  return (
+    <div className="h-full bg-gray-50/50 p-6 overflow-y-auto">
+      <div className="max-w-[1600px] mx-auto">
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-2xl font-bold text-slate-800">Form</h1>
+          <div className="flex gap-2">
+            <button className="p-2 hover:bg-gray-100 rounded-full">
+              <Search className="w-5 h-5 text-gray-500" />
+            </button>
+            <button className="p-2 hover:bg-gray-100 rounded-full">
+              <MoreHorizontal className="w-5 h-5 text-gray-500" />
+            </button>
+          </div>
+        </div>
+
+        <div className="flex gap-6 h-auto min-h-[calc(100vh-140px)]">
+          {/* Left Side - Input Form */}
+          <div className="w-5/12 bg-white rounded-3xl shadow-sm border border-gray-100 p-8 flex flex-col h-full">
+            <h2 className="text-xl font-bold text-slate-800 mb-8">กรอกข้อมูลเอกสาร</h2>
+            
+            <div className="space-y-6 flex-1 overflow-y-auto pr-2 custom-scrollbar">
+              
+              {/* --- 1. Category Dropdown (เพิ่มใหม่ตาม Requirement) --- */}
+              {/* --- 1.ลักษณะเอกสาร (Moved to Top) --- */}
+              <div>
+                <label className={labelStyle}>ลักษณะเอกสาร</label>
+                <div className="relative">
+                  <select 
+                    className={`${inputStyle} appearance-none cursor-pointer`}
+                    value={data.type}
+                    onChange={(e) => handleInputChange('type', e.target.value)}
+                  >
+                    <option value="pv">ใบเบิกเงิน (Payment Voucher - PV)</option>
+                    <option value="rv">ใบรับเงิน (Receive Voucher - RV)</option>
+                    <option value="jv">ใบสำคัญรายวันทั่วไป (Journal Voucher - JV)</option>
+                  </select>
+                  <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-500">
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M2.5 4.5L6 8L9.5 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  </div>
+                </div>
+              </div>
+
+              {/* --- 2. หมวดหมู่บัญชี (Moved below Document Style) --- */}
+            {data.type !== "rv" && (
+              <div>
+                <label className={labelStyle}>หมวดหมู่บัญชี (Category) <span className="text-red-500">*</span></label>
+                <div className="relative">
+                  <select 
+                    className={`${inputStyle} appearance-none cursor-pointer border-blue-200 bg-blue-50`}
+                    value={selectedCategoryId}
+                    onChange={(e) => setSelectedCategoryId(e.target.value)}
+                  >
+                    <option value="">-- กรุณาเลือกหมวดหมู่ --</option>
+                    {categories.map(cat => (
+                        <option key={cat.id} value={cat.id}>{cat.name_th}</option>
+                    ))}
+                  </select>
+                  <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-500">
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M2.5 4.5L6 8L9.5 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  </div>
+                </div>
+              </div>
+            )}
+              {/* --- 3. JV Document Consolidation Search (Show only for JV) --- */}
+              {data.type === 'jv' && (
+                <div className="p-5 bg-blue-50/50 border border-blue-100 rounded-2xl space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                  <label className="text-sm font-black text-blue-700 flex items-center gap-2">
+                    <Search className="w-4 h-4" />
+                    ดึงข้อมูลเอกสารเพื่อรวมใบเดียว (Consolidate)
+                  </label>
+                  <div className="flex gap-2">
+                    <input 
+                      type="text" 
+                      className={`${inputStyle} bg-white border-blue-200`}
+                      placeholder="กรอกเลขที่ ปส... (เช่น ปส.2567/001)"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleSearchDocs()}
+                    />
+                    <button 
+                      onClick={handleSearchDocs}
+                      disabled={isSearchingDocs}
+                      className="px-6 bg-blue-600 text-white rounded-xl font-bold text-sm hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center shrink-0"
+                    >
+                      {isSearchingDocs ? <Loader2 className="w-4 h-4 animate-spin" /> : 'ค้นหา'}
+                    </button>
+                  </div>
+
+                  {searchResults.length > 0 && (
+                    <div className="space-y-2 mt-4 max-h-40 overflow-y-auto pr-2 custom-scrollbar">
+                      {searchResults.map((res) => (
+                        <div key={res.id || res.case_no || Math.random()} className="flex justify-between items-center p-3 bg-white border border-blue-100 rounded-xl shadow-sm hover:border-blue-300 transition-colors">
+                          <div className="overflow-hidden">
+                            <p className="text-xs font-black text-slate-800 truncate">{res.doc_no || res.case_no}</p>
+                            <p className="text-[10px] text-slate-500 truncate">{res.purpose}</p>
+                          </div>
+                          <button 
+                            onClick={() => pullDocumentData(res)}
+                            className="px-3 py-1.5 bg-blue-100 text-blue-700 rounded-lg text-[10px] font-black hover:bg-blue-200 transition-colors shrink-0 ml-2"
+                          >
+                            ดึงข้อมูล (Pull)
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Date Selection Block (เหมือนเดิม) */}
+              <div className="grid grid-cols-1 gap-4">
+                <div className="col-span-1">
+                  <label className={labelStyle}>วันที่</label>
+                  <div className="flex gap-2">
+                     <div className="relative w-1/4">
+                       <select
+                        className={`${inputStyle} appearance-none cursor-pointer ${!data.date ? 'text-gray-400' : ''}`}
+                        value={data.date}
+                        onChange={(e) => handleInputChange('date', e.target.value)}
+                       >
+                         <option value="" disabled>วันที่</option>
+                         {Array.from({ length: 31 }, (_, i) => i + 1).map(d => (
+                           <option key={d} value={d.toString().padStart(2, '0')} className="text-gray-900">{d}</option>
+                         ))}
+                       </select>
+                     </div>
+                     <div className="relative w-1/2">
+                       <select
+                        className={`${inputStyle} appearance-none cursor-pointer ${!data.month ? 'text-gray-400' : ''}`}
+                        value={data.month}
+                        onChange={(e) => handleInputChange('month', e.target.value)}
+                       >
+                         <option value="" disabled>เดือน</option>
+                         {[
+                           'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
+                           'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'
+                         ].map(m => (
+                           <option key={m} value={m} className="text-gray-900">{m}</option>
+                         ))}
+                       </select>
+                     </div>
+                     <div className="relative w-1/4">
+                       <select
+                        className={`${inputStyle} appearance-none cursor-pointer ${!data.year ? 'text-gray-400' : ''}`}
+                        value={data.year}
+                        onChange={(e) => handleInputChange('year', e.target.value)}
+                       >
+                         <option value="" disabled>ปี</option>
+                         {Array.from({ length: 11 }, (_, i) => 2565 + i).map(y => (
+                           <option key={y} value={y.toString()} className="text-gray-900">{y}</option>
+                         ))}
+                       </select>
+                     </div>
+                  </div>
+                </div>
+              </div>
+
+
+
+               {/* Bank Account Dropdown for RV */}
+               {data.type === 'rv' && (
+                  <div>
+                    <label className={labelStyle}>เลขที่บัญชีธนาคาร/เงินสด</label>
+                    <div className="relative">
+                      <select 
+                        className={`${inputStyle} appearance-none cursor-pointer`}
+                        value={selectedBankAccountId} // ใช้ เป็น ID เป็น Value 
+                        onChange={(e) => {
+                          const id = e.target.value;
+                          setSelectedBankAccountId(id);
+                          // หา Object เพื่อเอาชื่อมาโชว์ใน Preview Template
+                          const account = bankAccounts.find(b => b.id === id);
+                          if (account) {
+                            // Update display text for Template
+                            const displayText = `${account.bank_name} - ${account.account_number}`;
+                            handleInputChange('bankAccount', displayText); 
+                          }
+                        }}
+                      >
+                        <option value="">-- เลือกเลขที่บัญชี --</option>
+                        {bankAccounts.map(b => (
+                          <option key={b.id} value={b.id}>
+                            {b.bank_name} - {b.account_number}
+                          </option>
+                        ))}
+                      </select>
+                      <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-500">
+                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M2.5 4.5L6 8L9.5 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      </div>
+                    </div>
+                  </div>
+               )}
+
+               {/* PS No for PV */}
+               {data.type === 'pv' && (
+                 <div>
+                   <label htmlFor="psNo" className={labelStyle}>เลขที่ ปส (ปส 03011007/...)</label>
+                   <div className="flex items-center gap-2">
+                     <span className="text-sm font-bold text-gray-500 shrink-0">ปส 03011007/</span>
+                     <input 
+                      id="psNo"
+                      type="text" 
+                      className={inputStyle}
+                      value={data.psNo}
+                      onChange={(e) => handleInputChange('psNo', e.target.value)}
+                      placeholder="กรอกเลขที่ต่อท้าย"
+                    />
+                   </div>
+                 </div>
+               )}
+
+              <div>
+                <label htmlFor="name" className={labelStyle}>ข้าพเจ้า (ผู้ขอเบิก/ผู้รับเงิน)</label>
+                <input 
+                  id="name"
+                  type="text" 
+                  className={inputStyle}
+                  value={data.name}
+                  onChange={(e) => handleInputChange('name', e.target.value)}
+                  placeholder="กรอกชื่อ-นามสกุล"
+                />
+              </div>
+
+               <div>
+                <label htmlFor="position" className={labelStyle}>ตำแหน่ง</label>
+                <input 
+                  id="position"
+                  type="text" 
+                  className={inputStyle}
+                  value={data.position}
+                  onChange={(e) => handleInputChange('position', e.target.value)}
+                  placeholder="กรอกตำแหน่ง"
+                />
+              </div>
+
+
+
+              <div>
+                <div className="flex justify-between items-center mb-4">
+                   <label className={labelStyle}>รายการที่เบิก / ทำ</label>
+                   <button onClick={addItem} className="text-blue-500 text-sm font-medium flex items-center hover:text-blue-600">
+                     <Plus size={16} className="mr-1" /> เพิ่มรายการ
+                   </button>
+                </div>
+                
+                <div className="space-y-3">
+                  {data.items.map((item, index) => (
+                    <div key={item.id} className="p-4 bg-gray-50 rounded-xl group relative border border-gray-100 hover:border-blue-100 transition-colors">
+                       <div className="flex gap-3 items-start">
+                          <div className="flex-1">
+                             <div className="flex gap-3 mb-4">
+                                <span className="text-xs text-gray-400 mt-3">{index + 1}.</span>
+                                <div className="flex-1">
+                                  <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase tracking-wider">รายการสินค้า / รายละเอียด</label>
+                                  <input 
+                                    type="text" 
+                                    placeholder="กรอกชื่อรายการ"
+                                    className={`${inputStyle} bg-white`}
+                                    value={item.description}
+                                    onChange={(e) => handleItemChange(item.id, 'description', e.target.value)}
+                                  />
+                                </div>
+                             </div>
+                             <div className="flex gap-3 pl-6">
+                                <div className="w-24">
+                                   <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase tracking-wider">จำนวน</label>
+                                   <input 
+                                    type="text" 
+                                    className={`${inputStyle} bg-white`}
+                                    value={item.quantity}
+                                    onChange={(e) => handleItemChange(item.id, 'quantity', e.target.value)}
+                                  />
+                                </div>
+                                <div className="w-24">
+                                   <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase tracking-wider">ราคา (บาท)</label>
+                                   <input 
+                                    type="text" 
+                                    className={`${inputStyle} bg-white`}
+                                    value={item.price}
+                                    onChange={(e) => handleItemChange(item.id, 'price', e.target.value)}
+                                  />
+                                </div>
+                                 <div className="flex-1">
+                                   <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase tracking-wider">
+                                     {data.type === 'pv' ? 'หน่วยสินค้า' : 'เลขที่อ้างอิง'}
+                                   </label>
+                                   <input 
+                                    type="text" 
+                                    className={`${inputStyle} bg-white`}
+                                    value={data.type === 'pv' ? item.unit : item.refNo}
+                                    onChange={(e) => handleItemChange(item.id, data.type === 'pv' ? 'unit' : 'refNo', e.target.value)}
+                                  />
+                                </div>
+                             </div>
+                          </div>
+                          <button 
+                            onClick={() => removeItem(item.id)}
+                            className="p-2 text-red-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors mt-6"
+                          >
+                            <Trash2 size={18} />
+                          </button>
+                       </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Right Side - Preview */}
+          <div className="w-7/12 flex flex-col gap-6">
+              <div className="flex-1 bg-gray-100 rounded-3xl overflow-hidden shadow-inner p-8 flex items-start justify-center overflow-y-auto">
+                <div className="transform scale-90 origin-top shadow-xl bg-white" style={{ 
+                  WebkitFontSmoothing: 'antialiased',
+                  MozOsxFontSmoothing: 'grayscale',
+                  backfaceVisibility: 'hidden'
+                }}>
+                  {data.type === 'pv' && <PaymentVoucherTemplate ref={printRef} data={data} />}
+                  {data.type === 'rv' && <ReceiveVoucherTemplate ref={printRef} data={data} />}
+                  {data.type === 'jv' && <JournalVoucherTemplate ref={printRef} data={data} />}
+                </div>
+              </div>
+
+             <div className="flex justify-between gap-4">
+                <button 
+                  onClick={() => generatePDF('submit')}
+                  disabled={isSaving}
+                  className="flex-1 bg-white border border-gray-200 text-gray-700 py-4 rounded-xl font-semibold flex items-center justify-center gap-2 hover:bg-gray-50 transition-colors shadow-sm disabled:opacity-50"
+                >
+                  {isSaving ? (
+                    <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
+                  ) : (
+                    <Save size={20} />
+                  )}
+                  บันทึกเอกสาร & ส่งอนุมัติ
+                </button>
+                <button 
+                  onClick={() => generatePDF('download')}
+                  disabled={isSaving}
+                  className="flex-1 bg-[#0099FF] text-white py-4 rounded-xl font-semibold flex items-center justify-center gap-2 hover:bg-blue-600 transition-colors shadow-sm shadow-blue-200 disabled:opacity-50"
+                >
+                  <Download size={20} />
+                  ดาวน์โหลด PDF
+                </button>
+             </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
