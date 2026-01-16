@@ -261,14 +261,7 @@ export const uploadDocumentFile = async (caseId: string, file: File): Promise<an
   return response.data;
 };
 
-// [NEW] API for Profit & Loss
 export const getProfitLossData = async (year: number): Promise<ProfitLossBackendData> => {
-  try {
-    const response = await api.get(`/profit-loss?year=${year}`);
-    // If backend doesn't exist yet, this will fail and we'll use fallback in the component
-    return response.data;
-  } catch (error) {
-    console.error("Failed to fetch P&L data, using fallback structure", error);
-    throw error;
-  }
+  const response = await api.get(`/profit-loss?year=${year}`);
+  return response.data.data ?? response.data;
 };
