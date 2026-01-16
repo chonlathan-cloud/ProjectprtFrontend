@@ -258,7 +258,21 @@ export const Dashboard: React.FC<DashboardProps> = ({ isDarkMode, toggleTheme })
                   </div>
                 </div>
                 <div className="text-right">
-                  <span className="text-lg font-bold text-slate-800 dark:text-white">{item.amount.toLocaleString()} บาท</span>
+                  <span className="text-lg font-bold text-slate-800 dark:text-white">
+                    {item.amount.toLocaleString()} บาท
+                  </span>
+                  {item.receipt_url ? (
+                    <a
+                      href={item.receipt_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mt-1 inline-block text-xs font-bold text-blue-600 hover:underline"
+                    >
+                      View file
+                    </a>
+                  ) : (
+                    <span className="mt-1 block text-xs text-slate-400">No file</span>
+                  )}
                 </div>
               </div>
             ))

@@ -24,10 +24,15 @@ export const DocumentManager: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [showMissingOnly, setShowMissingOnly] = useState(true);
   const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
   const [uploadSuccess, setUploadSuccess] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const visibleDocuments = showMissingOnly
+  ? documents.filter((doc) => !doc.is_receipt_uploaded)
+  : documents;
+
 
   const loadDocuments = async () => {
     setLoading(true);
@@ -212,9 +217,12 @@ export const DocumentManager: React.FC = () => {
              <button onClick={loadDocuments} className="p-3 text-slate-500 hover:bg-slate-100 rounded-xl transition-colors">
                <Clock size={20} />
              </button>
-             <button className="flex items-center gap-2 px-6 py-2.5 bg-white border-2 border-slate-200 rounded-xl font-black text-sm hover:border-slate-300 transition-all">
+             <button
+                onClick={() => setShowMissingOnly((prev) => !prev)}
+                className="flex items-center gap-2 px-6 py-2.5 bg-white border-2 border-slate-200 rounded-xl font-black text-sm hover:border-slate-300 transition-all"
+              >
                 <Filter size={16} />
-                Filters
+                {showMissingOnly ? 'Missing only' : 'Show All'}
              </button>
           </div>
         </div>
@@ -238,8 +246,8 @@ export const DocumentManager: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
-              {documents.length > 0 ? (
-                documents.map((doc) => (
+              {visibleDocuments.length > 0 ? (
+                visibleDocuments.map((doc) => (
                   <tr key={doc.id} className={`hover:bg-slate-50/80 transition-all group ${!doc.is_receipt_uploaded ? 'bg-red-50/30' : ''}`}>
                     <td className="px-8 py-6">
                       <div className="flex items-center gap-3">
