@@ -34,7 +34,14 @@ export interface DashboardData {
   };
   monthlyStats: Array<{ name: string; value: number; highlight?: boolean }>;
   activityStats: Array<{ name: string; value: number; fill: string }>;
-  latestTransactions: Array<{ id: string; initial: string; name: string; description: string; amount: number }>;
+  latestTransactions: Array<{
+    id: string;
+    initial: string;
+    name: string;
+    description: string;
+    amount: number;
+    receipt_url?: string;
+  }>;
 }
 
 export interface InsightsData {
