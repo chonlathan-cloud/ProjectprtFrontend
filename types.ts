@@ -32,7 +32,7 @@ export interface Category {
 }
 
 export interface User {
-  user_id: string;
+  requester_id: string;
   name: string;
   email: string;
   position?: string;
