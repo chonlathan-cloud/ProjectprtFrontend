@@ -231,7 +231,7 @@ export const DocumentManager: React.FC = () => {
               <tr className="bg-slate-50/50">
                 <th className="px-8 py-5 text-xs font-black text-slate-400 uppercase tracking-[0.2em] border-b border-slate-100">Document No.</th>
                 <th className="px-8 py-5 text-xs font-black text-slate-400 uppercase tracking-[0.2em] border-b border-slate-100">Date</th>
-                <th className="px-8 py-5 text-xs font-black text-slate-400 uppercase tracking-[0.2em] border-b border-slate-100">Requester</th>
+                <th className="px-8 py-5 text-xs font-black text-slate-400 uppercase tracking-[0.2em] border-b border-slate-100">ผู้ทำรายการ</th>
                 <th className="px-8 py-5 text-xs font-black text-slate-400 uppercase tracking-[0.2em] border-b border-slate-100 text-right">Amount</th>
                 <th className="px-8 py-5 text-xs font-black text-slate-400 uppercase tracking-[0.2em] border-b border-slate-100 text-center">Status</th>
                 <th className="px-8 py-5 text-xs font-black text-slate-400 uppercase tracking-[0.2em] border-b border-slate-100 text-center">Action</th>

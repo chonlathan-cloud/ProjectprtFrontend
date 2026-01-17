@@ -1,4 +1,5 @@
 import React, { forwardRef } from 'react';
+import { toThaiBaht } from '../services/utils';
 
 export interface DocumentData {
   type: 'pv' | 'rv' | 'jv';
@@ -115,7 +116,7 @@ export const PaymentVoucherTemplate = forwardRef<HTMLDivElement, { data: Documen
         <tfoot>
           <tr className="h-10">
             <td className="border border-black p-2 text-center font-bold">รวม</td>
-            <td colSpan={3} className="border border-black p-2 text-center font-bold">ศูนย์บาทถ้วน</td>
+            <td colSpan={3} className="border border-black p-2 text-center font-bold">{toThaiBaht(total)}</td>
             <td className="border border-black p-2 text-right font-bold">{total.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
           </tr>
         </tfoot>
@@ -210,7 +211,7 @@ export const ReceiveVoucherTemplate = forwardRef<HTMLDivElement, { data: Documen
         <tfoot>
           <tr className="h-10">
             <td className="border border-black p-2 text-center font-bold">รวม</td>
-            <td colSpan={2} className="border border-black p-2 text-center font-bold">ศูนย์บาทถ้วน</td>
+            <td colSpan={2} className="border border-black p-2 text-center font-bold">{toThaiBaht(total)}</td>
             <td className="border border-black p-2 text-right font-bold">{total.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
           </tr>
         </tfoot>
@@ -302,7 +303,7 @@ export const JournalVoucherTemplate = forwardRef<HTMLDivElement, { data: Documen
         <tfoot>
           <tr className="h-10">
             <td className="border border-black p-2 text-center font-bold">รวม</td>
-            <td colSpan={2} className="border border-black p-2 text-center font-bold">ศูนย์บาทถ้วน</td>
+            <td colSpan={2} className="border border-black p-2 text-center font-bold">{toThaiBaht(total)}</td>
             <td className="border border-black p-2 text-right font-bold">{total.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
           </tr>
         </tfoot>

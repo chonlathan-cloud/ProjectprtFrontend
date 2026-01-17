@@ -29,22 +29,50 @@ const INITIAL_DATA: DocumentData = {
   ]
 };
 
+const FORM_STORAGE_KEY = 'pending_form_data';
+
 export const Form: React.FC = () => {
-  const [data, setData] = useState<DocumentData>(INITIAL_DATA);
+  // --- Load Persistent State ---
+  const getSavedData = () => {
+    const saved = localStorage.getItem(FORM_STORAGE_KEY);
+    if (!saved) return null;
+    try {
+      return JSON.parse(saved);
+    } catch (e) {
+      console.error("Failed to parse saved form data", e);
+      return null;
+    }
+  };
+
+  const savedState = getSavedData();
+
+  const [data, setData] = useState<DocumentData>(savedState?.data || INITIAL_DATA);
   const [isSaving, setIsSaving] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
-  const [transactionType, setTransactionType] = useState<'EXPENSE' | 'REVENUE'>('EXPENSE');
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string>(savedState?.selectedCategoryId || '');
+  const [transactionType, setTransactionType] = useState<'EXPENSE' | 'REVENUE'>(savedState?.transactionType || 'EXPENSE');
   
   // JV Consolidation States
   const [searchQuery, setSearchQuery] = useState('');
-  const [linkedCaseIds, setLinkedCaseIds] = useState<string[]>([]);
+  const [linkedCaseIds, setLinkedCaseIds] = useState<string[]>(savedState?.linkedCaseIds || []);
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearchingDocs, setIsSearchingDocs] = useState(false);
   const printRef = useRef<HTMLDivElement>(null);
-  const [selectedBankAccountId, setSelectedBankAccountId] = useState<string>('');
+  const [selectedBankAccountId, setSelectedBankAccountId] = useState<string>(savedState?.selectedBankAccountId || '');
+
+  // 0. Sync State to LocalStorage
+  useEffect(() => {
+    const stateToSave = {
+      data,
+      selectedCategoryId,
+      transactionType,
+      linkedCaseIds,
+      selectedBankAccountId
+    };
+    localStorage.setItem(FORM_STORAGE_KEY, JSON.stringify(stateToSave));
+  }, [data, selectedCategoryId, transactionType, linkedCaseIds, selectedBankAccountId]);
 
   // 1. โหลดข้อมูลเมื่อเข้าหน้า Form
   useEffect(() => {
@@ -172,6 +200,7 @@ export const Form: React.FC = () => {
             const res = await createJV(jvPayload); 
             
             setData(prev => ({ ...prev, docNo: res.doc_no }));
+            localStorage.removeItem(FORM_STORAGE_KEY); // Clear after success
             alert(`สร้าง JV สำเร็จ! เลขที่: ${res.doc_no}`);
             return true;
 
@@ -252,6 +281,7 @@ export const Form: React.FC = () => {
 
       const displayDocNo = submitResult.doc_no || newCase.case_no;
       setData(prev => ({ ...prev, docNo: displayDocNo }));
+      localStorage.removeItem(FORM_STORAGE_KEY); // Clear after success
       
       alert(`บันทึกสำเร็จ! \nเลขที่อ้างอิง: ${displayDocNo} \n(สถานะ: รออนุมัติ/Submitted)`);
       return true;
@@ -592,7 +622,7 @@ export const Form: React.FC = () => {
                )}
 
               <div>
-                <label htmlFor="name" className={labelStyle}>ข้าพเจ้า (ผู้ขอเบิก/ผู้รับเงิน)</label>
+                <label htmlFor="name" className={labelStyle}>ข้าพเจ้า (ผู้ทำรายการ/ผู้รับเงิน)</label>
                 <input 
                   id="name"
                   type="text" 

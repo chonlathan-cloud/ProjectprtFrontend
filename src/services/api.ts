@@ -203,6 +203,18 @@ export const getUsers = async (): Promise<User[]> => {
   return Array.isArray(response.data) ? response.data : (response.data.data || []);
 };
 
+// Update User
+export const updateUser = async (userId: string, payload: Partial<User>): Promise<any> => {
+  const response = await api.patch(`/auth/users/${userId}/`, payload);
+  return response.data;
+};
+
+// Delete User
+export const deleteUser = async (userId: string): Promise<any> => {
+  const response = await api.delete(`/auth/users/${userId}/`);
+  return response.data;
+};
+
 // Fetch Bank Accounts
 export const getBankAccounts = async (): Promise<BankAccount[]> => {
    try {
