@@ -4,8 +4,10 @@ import {
   Edit2, Trash2,
   Loader2, AlertCircle
 } from 'lucide-react';
-import { getUsers, updateUser, deleteUser } from '../services/api';
+import { getUsers, updateUser, updateUserRoles, deleteUser } from '../services/api';
 import { User } from '../../types';
+
+const DEFAULT_ROLES = ['admin', 'accounting', 'finance', 'viewer', 'requester'];
 
 export const UserManager: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
@@ -36,6 +38,9 @@ export const UserManager: React.FC = () => {
   const handleUpdateUser = async (user: User) => {
     try {
       await updateUser(user.user_id, { name: user.name, position: user.position });
+      if (user.roles) {
+        await updateUserRoles(user.user_id, user.roles);
+      }
       setEditingUser(null);
       fetchUsers();
     } catch (err) {
@@ -63,6 +68,22 @@ export const UserManager: React.FC = () => {
     user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
     user.user_id.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const availableRoles = Array.from(new Set([
+    ...DEFAULT_ROLES,
+    ...users.flatMap((user) => user.roles || [])
+  ]));
+
+  const toggleRole = (role: string) => {
+    if (!editingUser) return;
+    const current = new Set(editingUser.roles || []);
+    if (current.has(role)) {
+      current.delete(role);
+    } else {
+      current.add(role);
+    }
+    setEditingUser({ ...editingUser, roles: Array.from(current) });
+  };
 
   const renderContent = () => {
     if (loading && users.length === 0) {
@@ -139,6 +160,25 @@ export const UserManager: React.FC = () => {
                       value={editingUser.position || ''}
                       onChange={(e) => setEditingUser({...editingUser, position: e.target.value})}
                     />
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      {availableRoles.map((role) => {
+                        const isActive = (editingUser.roles || []).includes(role);
+                        return (
+                          <button
+                            type="button"
+                            key={role}
+                            onClick={() => toggleRole(role)}
+                            className={`px-2 py-1 rounded text-[10px] font-bold border transition-colors ${
+                              isActive
+                                ? 'bg-indigo-500 text-white border-indigo-500'
+                                : 'bg-slate-100 text-slate-600 border-slate-200'
+                            }`}
+                          >
+                            {role}
+                          </button>
+                        );
+                      })}
+                    </div>
                     <div className="flex gap-2">
                       <button onClick={() => handleUpdateUser(editingUser)} className="text-[10px] bg-indigo-500 text-white px-2 py-1 rounded">บันทึก</button>
                       <button onClick={() => setEditingUser(null)} className="text-[10px] bg-slate-200 text-slate-700 px-2 py-1 rounded">ยกเลิก</button>
@@ -163,6 +203,18 @@ export const UserManager: React.FC = () => {
                         </span>
                       )}
                     </div>
+                    {user.roles && user.roles.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {user.roles.map((role) => (
+                          <span
+                            key={role}
+                            className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700"
+                          >
+                            {role}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </>
                 )}
               </div>

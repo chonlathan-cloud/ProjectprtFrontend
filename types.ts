@@ -33,10 +33,13 @@ export interface Category {
 }
 
 export interface User {
-  requester_id: string;
+  user_id: string;
+  requester_id?: string;
+  roles?: string[];
   name: string;
   email: string;
   position?: string;
+  is_active?: boolean;
 }
 
 export interface BankAccount {
