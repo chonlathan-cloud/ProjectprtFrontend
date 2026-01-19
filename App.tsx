@@ -11,7 +11,7 @@ import { ViewType } from './types';
 import  AdminApproval  from './src/components/AdminApproval';
 import { ProfitLoss } from './src/components/ProfitLoss';
 import { DocumentManager } from './src/components/DocumentManager';
-import { View } from 'lucide-react';
+import { UserManager } from './src/components/UserManager';
 
 const App: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -61,6 +61,8 @@ const App: React.FC = () => {
          return <ProfitLoss />;
       case ViewType.DOCUMENT_MANAGER:
          return <DocumentManager />;
+      case ViewType.USER_MANAGER:
+         return <UserManager />;
       default:
         return (
           <div className="flex items-center justify-center h-full">

@@ -7,6 +7,7 @@ export enum ViewType {
   CHAT_VIEW = 'CHAT_VIEW',
   ADMIN_APPROVAL = 'ADMIN_APPROVAL', // เพิ่ม Case ใหม่ สำหรับ approval list for documents
   DOCUMENT_MANAGER = 'DOCUMENT_MANAGER',
+  USER_MANAGER = 'USER_MANAGER',
 }
 
 export interface Transaction {
@@ -32,10 +33,13 @@ export interface Category {
 }
 
 export interface User {
-  requester_id: string;
+  user_id: string;
+  requester_id?: string;
+  roles?: string[];
   name: string;
   email: string;
   position?: string;
+  is_active?: boolean;
 }
 
 export interface BankAccount {

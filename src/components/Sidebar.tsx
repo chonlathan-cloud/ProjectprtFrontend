@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { 
   LayoutDashboard, 
@@ -6,13 +5,11 @@ import {
   Lightbulb, 
   TrendingUp, 
   MessageSquare,
-  Search,
-  MoreHorizontal,
   CheckCircle,
-  Files
+  Files,
+  Users
 } from 'lucide-react';
 import { ViewType } from '../../types';
-
 
 interface SidebarProps {
   activeView: ViewType;
@@ -28,6 +25,7 @@ const MENU_ITEMS = [
   { id: ViewType.CHAT_VIEW, label: 'Chat View', icon: MessageSquare },
   { id: ViewType.ADMIN_APPROVAL, label: 'Approvals (Admin)', icon: CheckCircle },
   { id: ViewType.DOCUMENT_MANAGER, label: 'Document Manager', icon: Files },
+  { id: ViewType.USER_MANAGER, label: 'User Management', icon: Users },
 ];
 
 interface NavButtonProps {
@@ -83,11 +81,6 @@ const UserProfile: React.FC = () => {
     </div>
   );
 };
-
-interface SidebarProps {
-  activeView: ViewType;
-  onViewChange: (view: ViewType) => void;
-}
 
 export const Sidebar: React.FC<SidebarProps> = ({ activeView, onViewChange }) => {
   return (

@@ -72,16 +72,17 @@ export const AdminApproval: React.FC = () => {
     <div className="p-6">
       <h2 className="text-2xl font-bold mb-4">รายการรออนุมัติ (Admin Approval)</h2>
       
-      <div className="overflow-x-auto">
-        <table className="min-w-full bg-white border rounded-lg shadow">
-          <thead className="bg-gray-100">
+      <div className="overflow-hidden bg-white border border-slate-200 rounded-2xl shadow-sm">
+        <div className="overflow-x-auto">
+          <table className="min-w-full">
+            <thead className="bg-slate-50">
             <tr>
-              <th className="py-3 px-4 text-left border-b">Doc No.</th>
-              <th className="py-3 px-4 text-left border-b">ผู้ขอเบิก</th>
-              <th className="py-3 px-4 text-left border-b">รายละเอียด</th>
-              <th className="py-3 px-4 text-right border-b">จำนวนเงิน</th>
-              <th className="py-3 px-4 text-center border-b">วันที่</th>
-              <th className="py-3 px-4 text-center border-b">จัดการ</th>
+              <th className="py-3 px-4 text-left border-b font-semibold text-slate-700">Doc No.</th>
+              <th className="py-3 px-4 text-left border-b font-semibold text-slate-700">ผู้ทำรายการ</th>
+              <th className="py-3 px-4 text-left border-b font-semibold text-slate-700">รายละเอียด</th>
+              <th className="py-3 px-4 text-right border-b font-semibold text-slate-700">จำนวนเงิน</th>
+              <th className="py-3 px-4 text-center border-b font-semibold text-slate-700">วันที่</th>
+              <th className="py-3 px-4 text-center border-b font-semibold text-slate-700">ดำเนินรายการ</th>
             </tr>
           </thead>
           <tbody>
@@ -129,7 +130,8 @@ export const AdminApproval: React.FC = () => {
               ))
             )}
           </tbody>
-        </table>
+          </table>
+        </div>
       </div>
     </div>
   );

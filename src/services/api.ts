@@ -209,11 +209,32 @@ export const getUsers = async (): Promise<User[]> => {
   const response = await api.get('/admin/users'); // Assuming this endpoint based on auth context
   const data = Array.isArray(response.data) ? response.data : (response.data.data || []);
   return data.map((u: any) => ({
+    user_id: u.user_id,
     requester_id: u.google_sub ?? u.email ?? u.user_id,
-    name: u.name,
+    roles: Array.isArray(u.roles) ? u.roles : [],
+    name: u.name ?? u.email,
     email: u.email,
-    position: u.position
+    position: u.position,
+    is_active: u.is_active,
   }));
+};
+
+// Update User
+export const updateUser = async (userId: string, payload: { name?: string; position?: string }): Promise<any> => {
+  const response = await api.patch(`/admin/users/${userId}`, payload);
+  return response.data;
+};
+
+// Update User Roles
+export const updateUserRoles = async (userId: string, roles: string[]): Promise<any> => {
+  const response = await api.post(`/admin/users/${userId}/roles`, { roles });
+  return response.data;
+};
+
+// Delete User (soft delete)
+export const deleteUser = async (userId: string): Promise<any> => {
+  const response = await api.delete(`/admin/users/${userId}`);
+  return response.data;
 };
 
 // Fetch Bank Accounts
