@@ -248,6 +248,7 @@ export const Form: React.FC = () => {
         alert("กรุณากรอกราคา/จำนวนให้มากกว่า 0");
         return false;
       }
+
       const itemsDescription = data.items
         .map(i => i.description)
         .filter(d => d.trim() !== '')
