@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, MoreHorizontal, Wallet, TrendingUp, CreditCard, ChevronLeft, ChevronRight, Sun, Moon } from 'lucide-react';
+import { Search, MoreHorizontal, Wallet, TrendingUp, CreditCard, ChevronLeft, ChevronRight, Sun, Moon, FileText, ExternalLink } from 'lucide-react';
 import  { getDashboardData, DashboardData} from '../services/api';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
@@ -247,31 +247,36 @@ export const Dashboard: React.FC<DashboardProps> = ({ isDarkMode, toggleTheme })
         <div className="space-y-6">
           {data.latestTransactions.length > 0 ? (
             data.latestTransactions.map((item) => (
-              <div key={item.id} className="flex items-center justify-between group cursor-pointer border-b border-slate-50 dark:border-slate-700 pb-4 last:border-0">
+              <div key={item.id} className="flex items-center justify-between p-4 rounded-2xl border border-transparent hover:border-slate-100 dark:hover:border-slate-800 hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-all duration-300 group cursor-pointer">
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-slate-100 dark:bg-slate-700 rounded-2xl flex items-center justify-center text-slate-500 dark:text-slate-400 font-bold group-hover:bg-blue-100 dark:group-hover:bg-blue-900 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                  <div className="w-14 h-14 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-900 rounded-2xl flex items-center justify-center text-slate-500 dark:text-slate-400 font-bold group-hover:scale-105 transition-transform duration-300 shadow-sm">
                     {item.initial}
                   </div>
                   <div>
-                    <h4 className="font-bold text-slate-800 dark:text-white">{item.name}</h4>
-                    <p className="text-slate-500 dark:text-slate-400 text-sm">{item.description}</p>
+                    <h4 className="font-bold text-slate-800 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">{item.name}</h4>
+                    <p className="text-slate-500 dark:text-slate-400 text-sm mt-0.5">{item.description}</p>
                   </div>
                 </div>
-                <div className="text-right">
+                <div className="flex flex-col items-end gap-2">
                   <span className="text-lg font-bold text-slate-800 dark:text-white">
-                    {item.amount.toLocaleString()} บาท
+                    {item.amount.toLocaleString()} <span className="text-sm font-medium text-slate-400">บาท</span>
                   </span>
                   {item.receipt_url ? (
                     <a
                       href={item.receipt_url}
                       target="_blank"
                       rel="noreferrer"
-                      className="mt-1 inline-block text-xs font-bold text-blue-600 hover:underline"
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-lg text-xs font-bold hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors border border-blue-100/50 dark:border-blue-800/50"
                     >
-                      View file
+                      <FileText size={14} />
+                      View File
+                      <ExternalLink size={12} className="opacity-50" />
                     </a>
                   ) : (
-                    <span className="mt-1 block text-xs text-slate-400">No file</span>
+                    <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 dark:bg-slate-800/50 text-slate-400 dark:text-slate-500 rounded-lg text-xs font-medium border border-slate-100 dark:border-slate-800">
+                      <FileText size={14} className="opacity-50" />
+                      No file
+                    </div>
                   )}
                 </div>
               </div>
