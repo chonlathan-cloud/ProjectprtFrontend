@@ -65,5 +65,4 @@ gcloud run deploy $SERVICE_NAME \
 
 echo "========================================================"
 echo "✅ DEPLOYMENT COMPLETE!"
-echo "🌐 Frontend URL: $(gcloud run services describe $SERVICE_NAME --platform managed --region $REGION --format 'value(status.url)')"
 echo "========================================================"
