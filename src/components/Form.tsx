@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { 
   Search, MoreHorizontal, Plus, Trash2, Download, Save, 
-  Loader2 
+  Loader2, Upload 
 } from 'lucide-react';
 import { PaymentVoucherTemplate, ReceiveVoucherTemplate, JournalVoucherTemplate, DocumentData } from './DocumentTemplates';
 import html2canvas from 'html2canvas';
@@ -61,7 +61,8 @@ export const Form: React.FC = () => {
   const [isSearchingDocs, setIsSearchingDocs] = useState(false);
   const printRef = useRef<HTMLDivElement>(null);
   const [selectedBankAccountId, setSelectedBankAccountId] = useState<string>(savedState?.selectedBankAccountId || '');
-
+  const psUploadRef = useRef<HTMLInputElement>(null);
+  const [selectedPsFile, setSelectedPsFile] = useState<File | null>(null);
   // 0. Sync State to LocalStorage
   useEffect(() => {
     const stateToSave = {
@@ -605,18 +606,41 @@ export const Form: React.FC = () => {
 
                {/* PS No for PV */}
                {data.type === 'pv' && (
-                 <div>
-                   <label htmlFor="psNo" className={labelStyle}>เลขที่ ปส (ปส 03011007/...)</label>
-                   <div className="flex items-center gap-2">
-                     <span className="text-sm font-bold text-gray-500 shrink-0">ปส 03011007/</span>
-                     <input 
-                      id="psNo"
-                      type="text" 
-                      className={inputStyle}
-                      value={data.psNo}
-                      onChange={(e) => handleInputChange('psNo', e.target.value)}
-                      placeholder="กรอกเลขที่ต่อท้าย"
-                    />
+                 <div className="space-y-4">
+                   <div>
+                     <label htmlFor="psNo" className={labelStyle}>เลขที่ ปส (ปส 03011007/...)</label>
+                     <div className="flex items-center gap-2">
+                       <span className="text-sm font-bold text-gray-500 shrink-0">ปส 03011007/</span>
+                       <input 
+                        id="psNo"
+                        type="text" 
+                        className={inputStyle}
+                        value={data.psNo}
+                        onChange={(e) => handleInputChange('psNo', e.target.value)}
+                        placeholder="กรอกเลขที่ต่อท้าย"
+                      />
+                     </div>
+                   </div>
+
+                   {/* PS Upload Button */}
+                   <div>
+                     <label className={labelStyle}>อัปโหลดใบ ปส</label>
+                     <div className="flex flex-col gap-2">
+                       <input 
+                         type="file" 
+                         className="hidden" 
+                         ref={psUploadRef}
+                         onChange={(e) => setSelectedPsFile(e.target.files?.[0] || null)}
+                         accept=".pdf,.jpg,.jpeg,.png"
+                       />
+                       <button 
+                         onClick={() => psUploadRef.current?.click()}
+                         className="flex items-center justify-center gap-2 p-3 bg-blue-50 border border-dashed border-blue-200 rounded-xl text-blue-600 hover:bg-blue-100 transition-all text-sm font-medium"
+                       >
+                         <Upload size={18} />
+                         {selectedPsFile ? selectedPsFile.name : 'เลือกไฟล์ ปส (PDF, JPEG, PNG)'}
+                       </button>
+                     </div>
                    </div>
                  </div>
                )}
