@@ -1,5 +1,6 @@
 // src/components/AdminApproval.tsx
 import React, { useState, useEffect } from 'react';
+import { FileText, ExternalLink } from 'lucide-react';
 import { getCases, approveCase, rejectCase } from '../services/api';
 // import { CaseResponse } from '../../types'; // เราจะใช้ Interface ภายในไฟล์นี้แทนเพื่อให้ตรงกับ Backend View
 
@@ -14,6 +15,7 @@ interface AdminCaseView {
   created_at: string;
   status: string;
   department?: string;
+  ps_url?: string | null;
 }
 
 export const AdminApproval: React.FC = () => {
@@ -94,8 +96,22 @@ export const AdminApproval: React.FC = () => {
               cases.map((item) => (
                 <tr key={item.id} className="hover:bg-gray-50">
                   {/* แสดง Case No (Doc No จะมาหลังอนุมัติ) */}
-                  <td className="py-3 px-4 border-b font-mono text-blue-600">
-                    {item.doc_no || item.case_no}
+                  <td className="py-3 px-4 border-b">
+                    <div className="flex flex-col gap-2">
+                      <span className="font-mono text-blue-600">{item.doc_no || item.case_no}</span>
+                      {item.ps_url ? (
+                        <a
+                          href={item.ps_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg text-xs font-bold hover:bg-blue-100 transition-colors border border-blue-100/50 w-fit"
+                        >
+                          <FileText size={14} />
+                          View File
+                          <ExternalLink size={12} className="opacity-50" />
+                        </a>
+                      ) : null}
+                    </div>
                   </td>
                   
                   <td className="py-3 px-4 border-b">

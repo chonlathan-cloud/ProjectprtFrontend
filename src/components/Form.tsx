@@ -7,7 +7,7 @@ import {
 import { PaymentVoucherTemplate, ReceiveVoucherTemplate, JournalVoucherTemplate, DocumentData } from './DocumentTemplates';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
-import { createCase, submitCase, getCategories, getUsers, getBankAccounts, searchDocumentsByNo, createJV } from '../services/api'; // Import API
+import { createCase, submitCase, getCategories, getUsers, getBankAccounts, searchDocumentsByNo, createJV, uploadDocumentFile } from '../services/api'; // Import API
 import { Category, User, BankAccount } from '../../types'; // Import Types
 
 const INITIAL_DATA: DocumentData = {
@@ -231,6 +231,12 @@ export const Form: React.FC = () => {
         return false;
     }
 
+    // PV ต้องมีไฟล์ ปส ก่อนส่งอนุมัติ
+    if (data.type === 'pv' && !selectedPsFile) {
+      alert("กรุณาอัปโหลดใบ ปส ก่อนส่งอนุมัติ");
+      return false;
+    }
+
     setIsSaving(true);
     try {
       // ---------------------------------------------------------
@@ -284,6 +290,17 @@ export const Form: React.FC = () => {
       setData(prev => ({ ...prev, docNo: displayDocNo }));
       localStorage.removeItem(FORM_STORAGE_KEY); // Clear after success
       
+      if (data.type === 'pv' && selectedPsFile) {
+        try {
+          await uploadDocumentFile(newCase.id, selectedPsFile, 'PS');
+          setSelectedPsFile(null);
+        } catch (error) {
+          console.error('PS upload failed:', error);
+          alert('บันทึกเอกสารสำเร็จ แต่การอัปโหลดใบ ปส ล้มเหลว กรุณาลองอัปโหลดใหม่ใน Document Manager');
+          return false;
+        }
+      }
+
       alert(`บันทึกสำเร็จ! \nเลขที่อ้างอิง: ${displayDocNo} \n(สถานะ: รออนุมัติ/Submitted)`);
       return true;
 
