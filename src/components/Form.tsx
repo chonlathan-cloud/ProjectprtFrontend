@@ -46,6 +46,12 @@ export const Form: React.FC = () => {
 
   const savedState = getSavedData();
 
+  const initialLinkedCases = savedState?.linkedCases || [];
+  const initialLinkedCaseIds = initialLinkedCases.length > 0
+    ? (savedState?.linkedCaseIds || initialLinkedCases.map((c: any) => c.id))
+    : [];
+  const initialMainCaseId = initialLinkedCases.length > 0 ? (savedState?.mainCaseId || '') : '';
+
   const [data, setData] = useState<DocumentData>(savedState?.data || INITIAL_DATA);
   const [isSaving, setIsSaving] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -56,7 +62,9 @@ export const Form: React.FC = () => {
   
   // JV Consolidation States
   const [searchQuery, setSearchQuery] = useState('');
-  const [linkedCaseIds, setLinkedCaseIds] = useState<string[]>(savedState?.linkedCaseIds || []);
+  const [linkedCaseIds, setLinkedCaseIds] = useState<string[]>(initialLinkedCaseIds);
+  const [linkedCases, setLinkedCases] = useState<any[]>(initialLinkedCases);
+  const [mainCaseId, setMainCaseId] = useState<string>(initialMainCaseId);
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearchingDocs, setIsSearchingDocs] = useState(false);
   const printRef = useRef<HTMLDivElement>(null);
@@ -70,10 +78,12 @@ export const Form: React.FC = () => {
       selectedCategoryId,
       transactionType,
       linkedCaseIds,
+      linkedCases,
+      mainCaseId,
       selectedBankAccountId
     };
     localStorage.setItem(FORM_STORAGE_KEY, JSON.stringify(stateToSave));
-  }, [data, selectedCategoryId, transactionType, linkedCaseIds, selectedBankAccountId]);
+  }, [data, selectedCategoryId, transactionType, linkedCaseIds, linkedCases, mainCaseId, selectedBankAccountId]);
 
   // 1. โหลดข้อมูลเมื่อเข้าหน้า Form
   useEffect(() => {
@@ -141,6 +151,10 @@ export const Form: React.FC = () => {
       }
       setSelectedCategoryId('');
       setSelectedBankAccountId('');
+      // Reset JV state when switching into or out of JV
+      if (value === 'jv' || data.type === 'jv') {
+        clearJvState();
+      }
     }
   };
 
@@ -176,6 +190,15 @@ export const Form: React.FC = () => {
     }));
   };
 
+  const clearJvState = () => {
+    setLinkedCaseIds([]);
+    setLinkedCases([]);
+    setMainCaseId('');
+    setSearchResults([]);
+    setSearchQuery('');
+    setData(prev => ({ ...prev, items: [...INITIAL_DATA.items] }));
+  };
+
   const handleSaveToBackend = async () => {
     // ---------------------------------------------------------
     // 1. ตรวจสอบและจัดการ JV (Journal Voucher) เป็นอันดับแรก
@@ -185,11 +208,20 @@ export const Form: React.FC = () => {
             alert("กรุณาดึงข้อมูลเอกสาร (Pull) อย่างน้อย 1 รายการเพื่อทำ JV");
             return false;
         }
+        if (!mainCaseId) {
+            alert("กรุณาเลือกเคสหลัก (Main Case) ก่อนสร้าง JV");
+            return false;
+        }
+        if (!linkedCaseIds.includes(mainCaseId)) {
+            alert("เคสหลักต้องอยู่ในรายการที่ดึง");
+            return false;
+        }
 
         setIsSaving(true);
         try {
-            // ใช้ Case แรกเป็น Main Case, ที่เหลือเป็น Linked
-            const [mainId, ...others] = linkedCaseIds;
+            // ใช้ Main Case ที่ผู้ใช้เลือก
+            const mainId = mainCaseId;
+            const others = linkedCaseIds.filter(id => id !== mainId);
             
             const jvPayload = {
                 main_case_id: mainId,
@@ -207,7 +239,8 @@ export const Form: React.FC = () => {
 
         } catch (error: any) {
             console.error('JV Save failed:', error);
-            alert(`สร้าง JV ไม่สำเร็จ: ${error.message}`);
+            const msg = error.response?.data?.detail || error.message;
+            alert(`สร้าง JV ไม่สำเร็จ: ${msg}`);
             return false;
         } finally {
             setIsSaving(false);
@@ -336,21 +369,34 @@ export const Form: React.FC = () => {
   const pullDocumentData = (doc: any) => {
     // doc คือ object ที่ได้จาก API search_cases (มี id, case_no, doc_no, etc.)
     
+    const normalized = {
+      id: doc.id,
+      doc_no: doc.doc_no || doc.case_no,
+      description: doc.description || doc.purpose || '',
+      requested_amount: doc.requested_amount || 0
+    };
+
     // เก็บ ID เข้า state
     setLinkedCaseIds(prev => {
         // ป้องกัน ID ซ้ำ
         if (prev.includes(doc.id)) return prev;
         return [...prev, doc.id];
     });
+    setLinkedCases(prev => {
+        if (prev.some((c: any) => c.id === normalized.id)) return prev;
+        return [...prev, normalized];
+    });
+    // ตั้งเคสล่าสุดที่ดึงเป็น Main Case โดยอัตโนมัติ
+    setMainCaseId(doc.id);
 
     // ส่วนแสดงผล (เหมือนเดิม)
     const pulledItem = {
       id: Date.now().toString(),
-      description: doc.description || doc.purpose || '', // ใช้ description จาก API
+      description: normalized.description, // ใช้ description จาก API
       quantity: '1',
       unit: 'รายการ',
-      price: doc.requested_amount || '0',
-      refNo: doc.doc_no || doc.case_no // โชว์เลขที่เอกสารอ้างอิง
+      price: normalized.requested_amount || '0',
+      refNo: normalized.doc_no // โชว์เลขที่เอกสารอ้างอิง
     };
 
     setData(prev => ({
@@ -359,7 +405,7 @@ export const Form: React.FC = () => {
       items: [...prev.items.filter(i => i.description !== ''), pulledItem]
     }));
     
-    alert(`ดึงข้อมูลจาก ${doc.doc_no} เรียบร้อย (Case ID: ${doc.id})`);
+    alert(`ดึงข้อมูลจาก ${normalized.doc_no} เรียบร้อย (Case ID: ${doc.id})`);
   };
 
   const generatePDF = async (action: 'submit' | 'download') => {
@@ -528,6 +574,42 @@ export const Form: React.FC = () => {
                           >
                             ดึงข้อมูล (Pull)
                           </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {linkedCases.length > 0 && (
+                    <div className="space-y-2 mt-4">
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs font-black text-slate-700">รายการที่ดึง</p>
+                        <button
+                          onClick={clearJvState}
+                          className="text-[10px] font-black text-red-600 hover:text-red-700"
+                        >
+                          ล้างรายการ
+                        </button>
+                      </div>
+                      {linkedCases.map((c: any) => (
+                        <div key={c.id} className="flex justify-between items-center p-3 bg-white border border-blue-100 rounded-xl shadow-sm">
+                          <div className="overflow-hidden">
+                            <p className="text-xs font-black text-slate-800 truncate">{c.doc_no}</p>
+                            <p className="text-[10px] text-slate-500 truncate">{c.description}</p>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0 ml-2">
+                            {mainCaseId === c.id ? (
+                              <span className="px-2 py-1 bg-emerald-100 text-emerald-700 rounded-md text-[10px] font-black">
+                                เคสหลัก
+                              </span>
+                            ) : (
+                              <button
+                                onClick={() => setMainCaseId(c.id)}
+                                className="px-2 py-1 bg-emerald-100 text-emerald-700 rounded-md text-[10px] font-black hover:bg-emerald-200"
+                              >
+                                ตั้งเป็นเคสหลัก
+                              </button>
+                            )}
+                          </div>
                         </div>
                       ))}
                     </div>
