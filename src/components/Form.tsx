@@ -2,12 +2,12 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { 
   Search, MoreHorizontal, Plus, Trash2, Download, Save, 
-  Loader2 
+  Loader2, Upload 
 } from 'lucide-react';
 import { PaymentVoucherTemplate, ReceiveVoucherTemplate, JournalVoucherTemplate, DocumentData } from './DocumentTemplates';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
-import { createCase, submitCase, getCategories, getUsers, getBankAccounts, searchDocumentsByNo, createJV } from '../services/api'; // Import API
+import { createCase, submitCase, getCategories, getUsers, getBankAccounts, searchDocumentsByNo, createJV, uploadDocumentFile } from '../services/api'; // Import API
 import { Category, User, BankAccount } from '../../types'; // Import Types
 
 const INITIAL_DATA: DocumentData = {
@@ -24,6 +24,7 @@ const INITIAL_DATA: DocumentData = {
   subject: '',
   purpose: '',
   psNo: '',
+  timestamp: '',
   items: [
     { id: '1', description: '', quantity: '', unit: '', price: '', refNo: '' }
   ]
@@ -46,6 +47,12 @@ export const Form: React.FC = () => {
 
   const savedState = getSavedData();
 
+  const initialLinkedCases = savedState?.linkedCases || [];
+  const initialLinkedCaseIds = initialLinkedCases.length > 0
+    ? (savedState?.linkedCaseIds || initialLinkedCases.map((c: any) => c.id))
+    : [];
+  const initialMainCaseId = initialLinkedCases.length > 0 ? (savedState?.mainCaseId || '') : '';
+
   const [data, setData] = useState<DocumentData>(savedState?.data || INITIAL_DATA);
   const [isSaving, setIsSaving] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -56,12 +63,27 @@ export const Form: React.FC = () => {
   
   // JV Consolidation States
   const [searchQuery, setSearchQuery] = useState('');
-  const [linkedCaseIds, setLinkedCaseIds] = useState<string[]>(savedState?.linkedCaseIds || []);
+  const [linkedCaseIds, setLinkedCaseIds] = useState<string[]>(initialLinkedCaseIds);
+  const [linkedCases, setLinkedCases] = useState<any[]>(initialLinkedCases);
+  const [mainCaseId, setMainCaseId] = useState<string>(initialMainCaseId);
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearchingDocs, setIsSearchingDocs] = useState(false);
   const printRef = useRef<HTMLDivElement>(null);
   const [selectedBankAccountId, setSelectedBankAccountId] = useState<string>(savedState?.selectedBankAccountId || '');
+  const psUploadRef = useRef<HTMLInputElement>(null);
+  const [selectedPsFile, setSelectedPsFile] = useState<File | null>(null);
+  const [psPreviewUrl, setPsPreviewUrl] = useState<string | null>(null);
 
+  // Manage PS File Preview URL
+  useEffect(() => {
+    if (selectedPsFile) {
+      const url = URL.createObjectURL(selectedPsFile);
+      setPsPreviewUrl(url);
+      return () => URL.revokeObjectURL(url);
+    } else {
+      setPsPreviewUrl(null);
+    }
+  }, [selectedPsFile]);
   // 0. Sync State to LocalStorage
   useEffect(() => {
     const stateToSave = {
@@ -69,10 +91,12 @@ export const Form: React.FC = () => {
       selectedCategoryId,
       transactionType,
       linkedCaseIds,
+      linkedCases,
+      mainCaseId,
       selectedBankAccountId
     };
     localStorage.setItem(FORM_STORAGE_KEY, JSON.stringify(stateToSave));
-  }, [data, selectedCategoryId, transactionType, linkedCaseIds, selectedBankAccountId]);
+  }, [data, selectedCategoryId, transactionType, linkedCaseIds, linkedCases, mainCaseId, selectedBankAccountId]);
 
   // 1. โหลดข้อมูลเมื่อเข้าหน้า Form
   useEffect(() => {
@@ -140,6 +164,10 @@ export const Form: React.FC = () => {
       }
       setSelectedCategoryId('');
       setSelectedBankAccountId('');
+      // Reset JV state when switching into or out of JV
+      if (value === 'jv' || data.type === 'jv') {
+        clearJvState();
+      }
     }
   };
 
@@ -175,6 +203,15 @@ export const Form: React.FC = () => {
     }));
   };
 
+  const clearJvState = () => {
+    setLinkedCaseIds([]);
+    setLinkedCases([]);
+    setMainCaseId('');
+    setSearchResults([]);
+    setSearchQuery('');
+    setData(prev => ({ ...prev, items: [...INITIAL_DATA.items] }));
+  };
+
   const handleSaveToBackend = async () => {
     // ---------------------------------------------------------
     // 1. ตรวจสอบและจัดการ JV (Journal Voucher) เป็นอันดับแรก
@@ -184,11 +221,20 @@ export const Form: React.FC = () => {
             alert("กรุณาดึงข้อมูลเอกสาร (Pull) อย่างน้อย 1 รายการเพื่อทำ JV");
             return false;
         }
+        if (!mainCaseId) {
+            alert("กรุณาเลือกเคสหลัก (Main Case) ก่อนสร้าง JV");
+            return false;
+        }
+        if (!linkedCaseIds.includes(mainCaseId)) {
+            alert("เคสหลักต้องอยู่ในรายการที่ดึง");
+            return false;
+        }
 
         setIsSaving(true);
         try {
-            // ใช้ Case แรกเป็น Main Case, ที่เหลือเป็น Linked
-            const [mainId, ...others] = linkedCaseIds;
+            // ใช้ Main Case ที่ผู้ใช้เลือก
+            const mainId = mainCaseId;
+            const others = linkedCaseIds.filter(id => id !== mainId);
             
             const jvPayload = {
                 main_case_id: mainId,
@@ -199,14 +245,21 @@ export const Form: React.FC = () => {
             console.log("Creating JV with:", jvPayload);
             const res = await createJV(jvPayload); 
             
-            setData(prev => ({ ...prev, docNo: res.doc_no }));
+            const now = new Date().toLocaleString('th-TH');
+            setData(prev => ({ 
+              ...prev, 
+              docNo: res.doc_no, 
+              psNo: res.ps_no || prev.psNo, // Assuming createJV might return ps_no or it's not applicable
+              timestamp: now 
+            }));
             localStorage.removeItem(FORM_STORAGE_KEY); // Clear after success
             alert(`สร้าง JV สำเร็จ! เลขที่: ${res.doc_no}`);
             return true;
 
         } catch (error: any) {
             console.error('JV Save failed:', error);
-            alert(`สร้าง JV ไม่สำเร็จ: ${error.message}`);
+            const msg = error.response?.data?.detail || error.message;
+            alert(`สร้าง JV ไม่สำเร็จ: ${msg}`);
             return false;
         } finally {
             setIsSaving(false);
@@ -228,6 +281,12 @@ export const Form: React.FC = () => {
     if (transactionType === 'REVENUE' && !selectedBankAccountId) {
         alert("กรุณาเลือกบัญชีธนาคาร/เงินสด ที่รับเงินเข้า")
         return false;
+    }
+
+    // PV ต้องมีไฟล์ ปส ก่อนส่งอนุมัติ
+    if (data.type === 'pv' && !selectedPsFile) {
+      alert("กรุณาอัปโหลดใบ ปส ก่อนส่งอนุมัติ");
+      return false;
     }
 
     setIsSaving(true);
@@ -277,12 +336,37 @@ export const Form: React.FC = () => {
       console.log("Creating Case with:", casePayload);
 
       const newCase = await createCase(casePayload);
+      
+      // Upload PS File if exists
+      if (selectedPsFile) {
+        try {
+          console.log(`Uploading PS file for Case ID: ${newCase.id}`);
+          await uploadDocumentFile(newCase.id, selectedPsFile);
+        } catch (uploadError) {
+          console.error('PS File upload failed:', uploadError);
+          // Don't stop the flow, but alert the user
+          alert("ไม่สามารถอัปโหลดไฟล์ไฟล์ ปส ได้ แต่สร้างเอกสารสำเร็จแล้ว");
+        }
+      }
+
       const submitResult = await submitCase(newCase.id);
 
       const displayDocNo = submitResult.doc_no || newCase.case_no;
-      setData(prev => ({ ...prev, docNo: displayDocNo }));
+      const now = new Date().toLocaleString('th-TH');
+      setData(prev => ({ ...prev, docNo: displayDocNo, timestamp: now }));
       localStorage.removeItem(FORM_STORAGE_KEY); // Clear after success
       
+      if (data.type === 'pv' && selectedPsFile) {
+        try {
+          await uploadDocumentFile(newCase.id, selectedPsFile, 'PS');
+          setSelectedPsFile(null);
+        } catch (error) {
+          console.error('PS upload failed:', error);
+          alert('บันทึกเอกสารสำเร็จ แต่การอัปโหลดใบ ปส ล้มเหลว กรุณาลองอัปโหลดใหม่ใน Document Manager');
+          return false;
+        }
+      }
+
       alert(`บันทึกสำเร็จ! \nเลขที่อ้างอิง: ${displayDocNo} \n(สถานะ: รออนุมัติ/Submitted)`);
       return true;
 
@@ -318,21 +402,34 @@ export const Form: React.FC = () => {
   const pullDocumentData = (doc: any) => {
     // doc คือ object ที่ได้จาก API search_cases (มี id, case_no, doc_no, etc.)
     
+    const normalized = {
+      id: doc.id,
+      doc_no: doc.doc_no || doc.case_no,
+      description: doc.description || doc.purpose || '',
+      requested_amount: doc.requested_amount || 0
+    };
+
     // เก็บ ID เข้า state
     setLinkedCaseIds(prev => {
         // ป้องกัน ID ซ้ำ
         if (prev.includes(doc.id)) return prev;
         return [...prev, doc.id];
     });
+    setLinkedCases(prev => {
+        if (prev.some((c: any) => c.id === normalized.id)) return prev;
+        return [...prev, normalized];
+    });
+    // ตั้งเคสล่าสุดที่ดึงเป็น Main Case โดยอัตโนมัติ
+    setMainCaseId(doc.id);
 
     // ส่วนแสดงผล (เหมือนเดิม)
     const pulledItem = {
       id: Date.now().toString(),
-      description: doc.description || doc.purpose || '', // ใช้ description จาก API
+      description: normalized.description, // ใช้ description จาก API
       quantity: '1',
       unit: 'รายการ',
-      price: doc.requested_amount || '0',
-      refNo: doc.doc_no || doc.case_no // โชว์เลขที่เอกสารอ้างอิง
+      price: normalized.requested_amount || '0',
+      refNo: normalized.doc_no // โชว์เลขที่เอกสารอ้างอิง
     };
 
     setData(prev => ({
@@ -341,41 +438,32 @@ export const Form: React.FC = () => {
       items: [...prev.items.filter(i => i.description !== ''), pulledItem]
     }));
     
-    alert(`ดึงข้อมูลจาก ${doc.doc_no} เรียบร้อย (Case ID: ${doc.id})`);
+    alert(`ดึงข้อมูลจาก ${normalized.doc_no} เรียบร้อย (Case ID: ${doc.id})`);
   };
 
   const generatePDF = async (action: 'submit' | 'download') => {
+    // ---------------------------------------------------------
+    // 1. Refresh Timestamp for current view
+    // ---------------------------------------------------------
+    const now = new Date().toLocaleString('th-TH');
+    setData(prev => ({ ...prev, timestamp: now }));
+    
+    // Wait for state to reflect in UI
+    await new Promise(resolve => setTimeout(resolve, 100));
+
     // ถ้ากด Submit ให้ Save ลง Backend ก่อน
     if (action === 'submit') {
         const success = await handleSaveToBackend();
-        if (!success) return; // ถ้า Save ไม่ผ่าน ไม่ต้อง Generate PDF ต่อ
+        if (!success) return; 
         
-        // รอแป๊บนึงให้ State docNo อัปเดตก่อน generate PDF
         await new Promise(resolve => setTimeout(resolve, 500));
     }
 
     if (!printRef.current) return;
 
     try {
-      // Ensure fonts are loaded before capturing
       await document.fonts.ready;
       
-      const canvas = await html2canvas(printRef.current, {
-        scale: 3, // 3 is usually enough and more stable than 4
-        useCORS: true,
-        logging: false,
-        backgroundColor: '#ffffff',
-        windowWidth: 1200, // Wider window for better layout stability during capture
-        onclone: (clonedDoc) => {
-          const element = clonedDoc.querySelector('.transform.scale-90');
-          if (element instanceof HTMLElement) {
-            element.style.transform = 'none';
-            element.style.fontFamily = "'Sarabun', sans-serif";
-          }
-        }
-      } as any);
-
-      const imgData = canvas.toDataURL('image/jpeg', 1.0);
       const pdf = new jsPDF({
         orientation: 'p',
         unit: 'px',
@@ -384,15 +472,74 @@ export const Form: React.FC = () => {
 
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = pdf.internal.pageSize.getHeight();
+
+      // Find all pages
+      const pages = printRef.current.querySelectorAll('.pdf-page');
       
-      pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight, undefined, 'FAST');
+      if (pages.length === 0) {
+        // Fallback to old behavior if no .pdf-page found
+        const canvas = await html2canvas(printRef.current, {
+           scale: 2, useCORS: true, backgroundColor: '#ffffff'
+        });
+        const imgData = canvas.toDataURL('image/jpeg', 1.0);
+        pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight, undefined, 'FAST');
+      } else {
+        for (let i = 0; i < pages.length; i++) {
+          const page = pages[i] as HTMLElement;
+          const canvas = await html2canvas(page, {
+            scale: 2,
+            useCORS: true,
+            allowTaint: true,
+            logging: false,
+            backgroundColor: '#ffffff',
+            onclone: (clonedDoc) => {
+              const style = clonedDoc.createElement('style');
+              style.innerHTML = `
+                @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap');
+                * {
+                  font-family: 'Sarabun', sans-serif !important;
+                  -webkit-font-smoothing: antialiased;
+                  -moz-osx-font-smoothing: grayscale;
+                  text-rendering: geometricPrecision;
+                  letter-spacing: 0.01rem;
+                  line-height: 1.6 !important;
+                  color: #222222 !important;
+                  font-weight: 400;
+                }
+                .font-bold, font-bold, h1, h2, h3, th, b, strong {
+                  font-weight: 700 !important;
+                }
+                .pdf-page {
+                  transform: none !important;
+                  width: 210mm !important;
+                }
+                td, th {
+                  padding-top: 0px !important;
+                  padding-bottom: 8px !important;
+                }
+                .border-black {
+                  border-color: #333333 !important;
+                }
+                  border-color: #333333 !important;
+                }
+              `;
+              clonedDoc.head.appendChild(style);
+            }
+          });
+
+          const imgData = canvas.toDataURL('image/jpeg', 1.0);
+          
+          if (i > 0) pdf.addPage();
+          pdf.setPage(i + 1);
+          pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight, undefined, 'FAST');
+        }
+      }
 
       const fileName = `${data.type}_${data.docNo || 'draft'}.pdf`;
 
       if (action === 'download') {
         pdf.save(fileName);
       } else {
-        // กรณี Submit บันทึก PDF ลงเครื่องด้วย (หรือจะอัปโหลดกลับไป Backend ก็ได้ในอนาคต)
         pdf.save(fileName);
       }
     } catch (error) {
@@ -514,6 +661,42 @@ export const Form: React.FC = () => {
                       ))}
                     </div>
                   )}
+
+                  {linkedCases.length > 0 && (
+                    <div className="space-y-2 mt-4">
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs font-black text-slate-700">รายการที่ดึง</p>
+                        <button
+                          onClick={clearJvState}
+                          className="text-[10px] font-black text-red-600 hover:text-red-700"
+                        >
+                          ล้างรายการ
+                        </button>
+                      </div>
+                      {linkedCases.map((c: any) => (
+                        <div key={c.id} className="flex justify-between items-center p-3 bg-white border border-blue-100 rounded-xl shadow-sm">
+                          <div className="overflow-hidden">
+                            <p className="text-xs font-black text-slate-800 truncate">{c.doc_no}</p>
+                            <p className="text-[10px] text-slate-500 truncate">{c.description}</p>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0 ml-2">
+                            {mainCaseId === c.id ? (
+                              <span className="px-2 py-1 bg-emerald-100 text-emerald-700 rounded-md text-[10px] font-black">
+                                เคสหลัก
+                              </span>
+                            ) : (
+                              <button
+                                onClick={() => setMainCaseId(c.id)}
+                                className="px-2 py-1 bg-emerald-100 text-emerald-700 rounded-md text-[10px] font-black hover:bg-emerald-200"
+                              >
+                                ตั้งเป็นเคสหลัก
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -605,18 +788,79 @@ export const Form: React.FC = () => {
 
                {/* PS No for PV */}
                {data.type === 'pv' && (
-                 <div>
-                   <label htmlFor="psNo" className={labelStyle}>เลขที่ ปส (ปส 03011007/...)</label>
-                   <div className="flex items-center gap-2">
-                     <span className="text-sm font-bold text-gray-500 shrink-0">ปส 03011007/</span>
-                     <input 
-                      id="psNo"
-                      type="text" 
-                      className={inputStyle}
-                      value={data.psNo}
-                      onChange={(e) => handleInputChange('psNo', e.target.value)}
-                      placeholder="กรอกเลขที่ต่อท้าย"
-                    />
+                 <div className="space-y-4">
+                   <div>
+                     <label htmlFor="psNo" className={labelStyle}>เลขที่ ปส (ปส 03011007/...)</label>
+                     <div className="flex items-center gap-2">
+                       <span className="text-sm font-bold text-gray-500 shrink-0">ปส 03011007/</span>
+                       <input 
+                        id="psNo"
+                        type="text" 
+                        className={inputStyle}
+                        value={data.psNo}
+                        onChange={(e) => handleInputChange('psNo', e.target.value)}
+                        placeholder="กรอกเลขที่ต่อท้าย"
+                      />
+                     </div>
+                   </div>
+
+                   {/* PS Upload Button */}
+                   <div>
+                     <label className={labelStyle}>อัปโหลดใบ ปส</label>
+                     <div className="flex flex-col gap-3">
+                       <input 
+                         type="file" 
+                         className="hidden" 
+                         ref={psUploadRef}
+                         onChange={(e) => setSelectedPsFile(e.target.files?.[0] || null)}
+                         accept=".pdf,.jpg,.jpeg,.png"
+                       />
+                       <button 
+                         onClick={() => psUploadRef.current?.click()}
+                         className="flex items-center justify-center gap-2 p-3 bg-blue-50 border border-dashed border-blue-200 rounded-xl text-blue-600 hover:bg-blue-100 transition-all text-sm font-medium"
+                       >
+                         <Upload size={18} />
+                         {selectedPsFile ? selectedPsFile.name : 'เลือกไฟล์ ปส (PDF, JPEG, PNG)'}
+                       </button>
+
+                       {/* Preview Area - Handles all orientations and sizes */}
+                       {psPreviewUrl && (
+                         <div className="relative mt-2 p-2 border border-gray-100 rounded-2xl bg-gray-50 flex flex-col items-center justify-center animate-in fade-in duration-300">
+                           {selectedPsFile?.type.startsWith('image/') ? (
+                             <div className="w-full h-48 overflow-hidden rounded-xl flex items-center justify-center bg-white border border-gray-100">
+                               <img 
+                                 src={psPreviewUrl} 
+                                 alt="PS Preview" 
+                                 className="max-w-full max-h-full object-contain" // Ensures landscape/portrait fits well
+                               />
+                             </div>
+                           ) : selectedPsFile?.type === 'application/pdf' ? (
+                             <div className="flex flex-col items-center p-6 gap-2 bg-white w-full rounded-xl border border-gray-100">
+                               <div className="p-4 bg-red-50 text-red-500 rounded-2xl">
+                                  <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
+                               </div>
+                               <span className="text-xs font-bold text-gray-500">ไฟล์ PDF</span>
+                               <span className="text-[10px] text-gray-400">{selectedPsFile.name}</span>
+                             </div>
+                           ) : (
+                             <div className="p-4 text-xs text-gray-400 italic">ตัวอย่างไฟล์ยังไม่รองรับการแสดงผล</div>
+                           )}
+                           
+                           {/* Remove Button */}
+                           <button 
+                             onClick={(e) => {
+                               e.preventDefault();
+                               e.stopPropagation();
+                               setSelectedPsFile(null);
+                             }}
+                             className="absolute top-4 right-4 p-1.5 bg-red-500 text-white rounded-full hover:bg-red-600 shadow-md transition-colors"
+                             title="ลบไฟล์"
+                           >
+                             <Trash2 size={12} />
+                           </button>
+                         </div>
+                       )}
+                     </div>
                    </div>
                  </div>
                )}

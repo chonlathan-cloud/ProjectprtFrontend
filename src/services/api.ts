@@ -278,9 +278,14 @@ export const createJV = async (payload: { main_case_id: string, linked_case_ids:
 };
 
 // [NEW] API for uploading document files
-export const uploadDocumentFile = async (caseId: string, file: File): Promise<any> => {
+export const uploadDocumentFile = async (
+  caseId: string,
+  file: File,
+  attachmentType: 'RECEIPT' | 'PS' | 'OTHER' | 'QUOTE' = 'RECEIPT'
+): Promise<any> => {
   const formData = new FormData();
   formData.append('file', file);
+  formData.append('attachment_type', attachmentType);
   const response = await api.post(`/cases/${caseId}/upload-receipt`, formData, {
     headers: {
       'Content-Type': 'multipart/form-data',

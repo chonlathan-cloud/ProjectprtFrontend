@@ -76,10 +76,7 @@ export const Insights: React.FC = () => {
   };
 
   const formatCurrency = (amount: number) => {
-    if (amount >= 1000000) {
-      return `${(amount / 1000000).toFixed(1)}M THB`;
-    }
-    return `${(amount / 1000).toFixed(1)}K THB`;
+    return `${amount.toLocaleString()} THB`;
   };
 
   return (
