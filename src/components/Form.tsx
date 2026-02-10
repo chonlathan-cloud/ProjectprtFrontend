@@ -337,18 +337,6 @@ export const Form: React.FC = () => {
 
       const newCase = await createCase(casePayload);
       
-      // Upload PS File if exists
-      if (selectedPsFile) {
-        try {
-          console.log(`Uploading PS file for Case ID: ${newCase.id}`);
-          await uploadDocumentFile(newCase.id, selectedPsFile);
-        } catch (uploadError) {
-          console.error('PS File upload failed:', uploadError);
-          // Don't stop the flow, but alert the user
-          alert("ไม่สามารถอัปโหลดไฟล์ไฟล์ ปส ได้ แต่สร้างเอกสารสำเร็จแล้ว");
-        }
-      }
-
       const submitResult = await submitCase(newCase.id);
 
       const displayDocNo = submitResult.doc_no || newCase.case_no;
