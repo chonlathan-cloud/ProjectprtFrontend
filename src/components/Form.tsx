@@ -24,6 +24,7 @@ const INITIAL_DATA: DocumentData = {
   subject: '',
   purpose: '',
   psNo: '',
+  timestamp: '',
   items: [
     { id: '1', description: '', quantity: '', unit: '', price: '', refNo: '' }
   ]
@@ -71,6 +72,18 @@ export const Form: React.FC = () => {
   const [selectedBankAccountId, setSelectedBankAccountId] = useState<string>(savedState?.selectedBankAccountId || '');
   const psUploadRef = useRef<HTMLInputElement>(null);
   const [selectedPsFile, setSelectedPsFile] = useState<File | null>(null);
+  const [psPreviewUrl, setPsPreviewUrl] = useState<string | null>(null);
+
+  // Manage PS File Preview URL
+  useEffect(() => {
+    if (selectedPsFile) {
+      const url = URL.createObjectURL(selectedPsFile);
+      setPsPreviewUrl(url);
+      return () => URL.revokeObjectURL(url);
+    } else {
+      setPsPreviewUrl(null);
+    }
+  }, [selectedPsFile]);
   // 0. Sync State to LocalStorage
   useEffect(() => {
     const stateToSave = {
@@ -232,7 +245,13 @@ export const Form: React.FC = () => {
             console.log("Creating JV with:", jvPayload);
             const res = await createJV(jvPayload); 
             
-            setData(prev => ({ ...prev, docNo: res.doc_no }));
+            const now = new Date().toLocaleString('th-TH');
+            setData(prev => ({ 
+              ...prev, 
+              docNo: res.doc_no, 
+              psNo: res.ps_no || prev.psNo, // Assuming createJV might return ps_no or it's not applicable
+              timestamp: now 
+            }));
             localStorage.removeItem(FORM_STORAGE_KEY); // Clear after success
             alert(`สร้าง JV สำเร็จ! เลขที่: ${res.doc_no}`);
             return true;
@@ -317,10 +336,24 @@ export const Form: React.FC = () => {
       console.log("Creating Case with:", casePayload);
 
       const newCase = await createCase(casePayload);
+      
+      // Upload PS File if exists
+      if (selectedPsFile) {
+        try {
+          console.log(`Uploading PS file for Case ID: ${newCase.id}`);
+          await uploadDocumentFile(newCase.id, selectedPsFile);
+        } catch (uploadError) {
+          console.error('PS File upload failed:', uploadError);
+          // Don't stop the flow, but alert the user
+          alert("ไม่สามารถอัปโหลดไฟล์ไฟล์ ปส ได้ แต่สร้างเอกสารสำเร็จแล้ว");
+        }
+      }
+
       const submitResult = await submitCase(newCase.id);
 
       const displayDocNo = submitResult.doc_no || newCase.case_no;
-      setData(prev => ({ ...prev, docNo: displayDocNo }));
+      const now = new Date().toLocaleString('th-TH');
+      setData(prev => ({ ...prev, docNo: displayDocNo, timestamp: now }));
       localStorage.removeItem(FORM_STORAGE_KEY); // Clear after success
       
       if (data.type === 'pv' && selectedPsFile) {
@@ -409,37 +442,28 @@ export const Form: React.FC = () => {
   };
 
   const generatePDF = async (action: 'submit' | 'download') => {
+    // ---------------------------------------------------------
+    // 1. Refresh Timestamp for current view
+    // ---------------------------------------------------------
+    const now = new Date().toLocaleString('th-TH');
+    setData(prev => ({ ...prev, timestamp: now }));
+    
+    // Wait for state to reflect in UI
+    await new Promise(resolve => setTimeout(resolve, 100));
+
     // ถ้ากด Submit ให้ Save ลง Backend ก่อน
     if (action === 'submit') {
         const success = await handleSaveToBackend();
-        if (!success) return; // ถ้า Save ไม่ผ่าน ไม่ต้อง Generate PDF ต่อ
+        if (!success) return; 
         
-        // รอแป๊บนึงให้ State docNo อัปเดตก่อน generate PDF
         await new Promise(resolve => setTimeout(resolve, 500));
     }
 
     if (!printRef.current) return;
 
     try {
-      // Ensure fonts are loaded before capturing
       await document.fonts.ready;
       
-      const canvas = await html2canvas(printRef.current, {
-        scale: 3, // 3 is usually enough and more stable than 4
-        useCORS: true,
-        logging: false,
-        backgroundColor: '#ffffff',
-        windowWidth: 1200, // Wider window for better layout stability during capture
-        onclone: (clonedDoc) => {
-          const element = clonedDoc.querySelector('.transform.scale-90');
-          if (element instanceof HTMLElement) {
-            element.style.transform = 'none';
-            element.style.fontFamily = "'Sarabun', sans-serif";
-          }
-        }
-      } as any);
-
-      const imgData = canvas.toDataURL('image/jpeg', 1.0);
       const pdf = new jsPDF({
         orientation: 'p',
         unit: 'px',
@@ -448,15 +472,74 @@ export const Form: React.FC = () => {
 
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = pdf.internal.pageSize.getHeight();
+
+      // Find all pages
+      const pages = printRef.current.querySelectorAll('.pdf-page');
       
-      pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight, undefined, 'FAST');
+      if (pages.length === 0) {
+        // Fallback to old behavior if no .pdf-page found
+        const canvas = await html2canvas(printRef.current, {
+           scale: 2, useCORS: true, backgroundColor: '#ffffff'
+        });
+        const imgData = canvas.toDataURL('image/jpeg', 1.0);
+        pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight, undefined, 'FAST');
+      } else {
+        for (let i = 0; i < pages.length; i++) {
+          const page = pages[i] as HTMLElement;
+          const canvas = await html2canvas(page, {
+            scale: 2,
+            useCORS: true,
+            allowTaint: true,
+            logging: false,
+            backgroundColor: '#ffffff',
+            onclone: (clonedDoc) => {
+              const style = clonedDoc.createElement('style');
+              style.innerHTML = `
+                @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap');
+                * {
+                  font-family: 'Sarabun', sans-serif !important;
+                  -webkit-font-smoothing: antialiased;
+                  -moz-osx-font-smoothing: grayscale;
+                  text-rendering: geometricPrecision;
+                  letter-spacing: 0.01rem;
+                  line-height: 1.6 !important;
+                  color: #222222 !important;
+                  font-weight: 400;
+                }
+                .font-bold, font-bold, h1, h2, h3, th, b, strong {
+                  font-weight: 700 !important;
+                }
+                .pdf-page {
+                  transform: none !important;
+                  width: 210mm !important;
+                }
+                td, th {
+                  padding-top: 0px !important;
+                  padding-bottom: 8px !important;
+                }
+                .border-black {
+                  border-color: #333333 !important;
+                }
+                  border-color: #333333 !important;
+                }
+              `;
+              clonedDoc.head.appendChild(style);
+            }
+          });
+
+          const imgData = canvas.toDataURL('image/jpeg', 1.0);
+          
+          if (i > 0) pdf.addPage();
+          pdf.setPage(i + 1);
+          pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight, undefined, 'FAST');
+        }
+      }
 
       const fileName = `${data.type}_${data.docNo || 'draft'}.pdf`;
 
       if (action === 'download') {
         pdf.save(fileName);
       } else {
-        // กรณี Submit บันทึก PDF ลงเครื่องด้วย (หรือจะอัปโหลดกลับไป Backend ก็ได้ในอนาคต)
         pdf.save(fileName);
       }
     } catch (error) {
@@ -724,7 +807,7 @@ export const Form: React.FC = () => {
                    {/* PS Upload Button */}
                    <div>
                      <label className={labelStyle}>อัปโหลดใบ ปส</label>
-                     <div className="flex flex-col gap-2">
+                     <div className="flex flex-col gap-3">
                        <input 
                          type="file" 
                          className="hidden" 
@@ -739,6 +822,44 @@ export const Form: React.FC = () => {
                          <Upload size={18} />
                          {selectedPsFile ? selectedPsFile.name : 'เลือกไฟล์ ปส (PDF, JPEG, PNG)'}
                        </button>
+
+                       {/* Preview Area - Handles all orientations and sizes */}
+                       {psPreviewUrl && (
+                         <div className="relative mt-2 p-2 border border-gray-100 rounded-2xl bg-gray-50 flex flex-col items-center justify-center animate-in fade-in duration-300">
+                           {selectedPsFile?.type.startsWith('image/') ? (
+                             <div className="w-full h-48 overflow-hidden rounded-xl flex items-center justify-center bg-white border border-gray-100">
+                               <img 
+                                 src={psPreviewUrl} 
+                                 alt="PS Preview" 
+                                 className="max-w-full max-h-full object-contain" // Ensures landscape/portrait fits well
+                               />
+                             </div>
+                           ) : selectedPsFile?.type === 'application/pdf' ? (
+                             <div className="flex flex-col items-center p-6 gap-2 bg-white w-full rounded-xl border border-gray-100">
+                               <div className="p-4 bg-red-50 text-red-500 rounded-2xl">
+                                  <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
+                               </div>
+                               <span className="text-xs font-bold text-gray-500">ไฟล์ PDF</span>
+                               <span className="text-[10px] text-gray-400">{selectedPsFile.name}</span>
+                             </div>
+                           ) : (
+                             <div className="p-4 text-xs text-gray-400 italic">ตัวอย่างไฟล์ยังไม่รองรับการแสดงผล</div>
+                           )}
+                           
+                           {/* Remove Button */}
+                           <button 
+                             onClick={(e) => {
+                               e.preventDefault();
+                               e.stopPropagation();
+                               setSelectedPsFile(null);
+                             }}
+                             className="absolute top-4 right-4 p-1.5 bg-red-500 text-white rounded-full hover:bg-red-600 shadow-md transition-colors"
+                             title="ลบไฟล์"
+                           >
+                             <Trash2 size={12} />
+                           </button>
+                         </div>
+                       )}
                      </div>
                    </div>
                  </div>
